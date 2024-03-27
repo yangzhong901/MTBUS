@@ -21,9 +21,9 @@ void Vars::ShowPara()
     std::cout << "Record Nums：" << RNums << std::endl;
     std::cout << "Embedding Dimention：" << Dim << std::endl;
     std::cout << "Query Nums：" << QNums << std::endl;
-    std::cout << "Similarity：" << (SimilarityF)SimF << std::endl;    
-	
-	const char* SearchFstr = (SearchF == 0) ? "TopKSearch" : "RangeSearch";
+    std::cout << "Similarity：" << (SimilarityF)SimF << std::endl;
+    
+    const char* SearchFstr = (SearchF == 0) ? "TopKSearch" : "RangeSearch";
     std::cout << "Search Type：" << SearchFstr << std::endl;
     const char* SearchKRstr = (SearchF == 0) ? "K:" : "Range:";
     std::cout << SearchKRstr << ((SearchF == 0) ? k : range) << std::endl;
@@ -273,9 +273,11 @@ void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candDa
             boxInersection = -1.0;
             return;
         }
-        //log regularization
-        boxInersection *= (float)abs(log10(tmp));
+        //log regularization，对数的相乘=相加取对数，先相加
+        boxInersection += tmp;           
     }
+    //log regularization，取对数
+    boxInersection = (float)abs(log10(boxInersection));
     candData cd;
     cd.rID = j;
     cd.boxIntersection = boxInersection;

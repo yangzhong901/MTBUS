@@ -61,7 +61,7 @@ __global__ void matMulKernel(Matrix* A, Matrix* B, Matrix* C)
 //计算Box-Embedding相交的大小
 __global__ void ComputeKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int N)
 {
-    double Cvalue = 1.0;//后续相乘，初始必须为1
+    float Cvalue = 1.0;//后续相乘，初始必须为1
 
     int strade = blockDim.x * gridDim.x;//跳步的大小，等于线程的宽
 
@@ -86,10 +86,11 @@ __global__ void ComputeKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int N)
             }
             else
             {    ////Cvalue *= tmp;//小数多次相乘会导致数值接近0，数值消失vanishing，需做正则化Normalization
-                // log正则化
-                Cvalue *= abs(log10(tmp));
+                // log正则化，先相加，后取对数
+                Cvalue +=tmp;
             }
         }
+        Cvalue = (float)abs(log10(Cvalue));
         //Cvalues的z正则化Z-Normalization
         //均值
         //double mean = 0;
