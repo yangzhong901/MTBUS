@@ -18,12 +18,12 @@ void Vars::ReadPara(char* argv[])
 
 void Vars::ShowPara()
 {
-    std::cout << "Record Nums£º" << RNums << std::endl;
-    std::cout << "Embedding Dimention£º" << Dim << std::endl;
-    std::cout << "Query Nums£º" << QNums << std::endl;
-    std::cout << "Similarity£º" << (SimilarityF)SimF << std::endl;
+    std::cout << "Record Numsï¿½ï¿½" << RNums << std::endl;
+    std::cout << "Embedding Dimentionï¿½ï¿½" << Dim << std::endl;
+    std::cout << "Query Numsï¿½ï¿½" << QNums << std::endl;
+    std::cout << "Similarityï¿½ï¿½" << (SimilarityF)SimF << std::endl;
     const char* SearchFstr = (SearchF == 0) ? "TopKSearch" : "RangeSearch";
-    std::cout << "Search Type£º" << SearchFstr << std::endl;
+    std::cout << "Search Typeï¿½ï¿½" << SearchFstr << std::endl;
     const char* SearchKRstr = (SearchF == 0) ? "K:" : "Range:";
     std::cout << SearchKRstr << ((SearchF == 0) ? k : range) << std::endl;
     
@@ -77,7 +77,7 @@ void Vars::ReadOrgTextData()
     if (infile.is_open())
     {
         getline(infile, line);
-        infile.clear();//ºöÂÔµÚÒ»ÐÐ
+        infile.clear();//ï¿½ï¿½ï¿½Ôµï¿½Ò»ï¿½ï¿½
         while (getline(infile, line))
         {            
             stringstream ss(line);
@@ -224,7 +224,7 @@ void MatMul()
     int height = 1024;
     int width = 1024;
 
-    //³õÊ¼»¯
+    //ï¿½ï¿½Ê¼ï¿½ï¿½
     int** A = new int* [width];//A[a][b]
     int** B = new int* [width];//B[b][a]
     int** C = new int* [width];//C[m][n]=C[a][a]
@@ -236,7 +236,7 @@ void MatMul()
         C[i] = new int[height];
     }
 
-    //¸³Öµ
+    //ï¿½ï¿½Öµ
     for (int i = 0; i < width; i++)
     {
         for (int j = 0; j < height; j++)
@@ -245,7 +245,7 @@ void MatMul()
             B[i][j] = 2;
         }
     }
-    //¾ØÕóÏà³Ë
+    //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     for (int m = 0; m < height; m++) {
         for (int n = 0; n < height; n++)
         {
@@ -273,9 +273,11 @@ void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candDa
             boxInersection = -1.0;
             return;
         }
-        //log regularization
-        boxInersection *= (float)abs(log10(tmp));
+        //log regularizationï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½=ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        boxInersection += tmp;           
     }
+    //log regularizationï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½
+    boxInersection = (float)abs(log10(boxInersection));
     candData cd;
     cd.rID = j;
     cd.boxIntersection = boxInersection;
@@ -314,7 +316,7 @@ void Vars::SearchCandidates(int qID)
     }
     //for (size_t c = 0; c < candidateSet.cans.size(); c++)
     //{
-    //    std::cout << "ID£º" << candidateSet.cans[c].rID << ";" << candidateSet.cans[c].boxIntersection << std::endl;
+    //    std::cout << "IDï¿½ï¿½" << candidateSet.cans[c].rID << ";" << candidateSet.cans[c].boxIntersection << std::endl;
     //}
     //Save qi's candidates
     candidateSets.push_back(candidateSet);
@@ -325,7 +327,7 @@ void Vars::VerifyAllCandidates(int id,int qID)
 {   
     resultDatas resultSet;
     resultSet.qID = qID;
-    //ºòÑ¡°´ÕÕembedÏà½»µÄ´óÐ¡ÅÅÐò
+    //ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½embedï¿½à½»ï¿½Ä´ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½
     sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
     for (size_t i = 0; i < candidateSets[id].cans.size(); i++)
     {
@@ -343,14 +345,14 @@ void Vars::topkSearch(int id, int qID)
     resultDatas resultSet;
     resultSet.qID = qID;
    
-    //ºòÑ¡°´ÕÕembedÏà½»µÄ´óÐ¡ÅÅÐò
-    //´ÓÐ¡µ½´óÅÅ,logÕýÔò»¯Ö®ºó£¬ÖµÔ½Ð¡Ô½ÏàËÆ
+    //ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½embedï¿½à½»ï¿½Ä´ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½
+    //ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,logï¿½ï¿½ï¿½ï¿½Ö®ï¿½ï¿½ÖµÔ½Ð¡Ô½ï¿½ï¿½ï¿½ï¿½
     sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
-    //´Ó´óµ½Ð¡ÅÅ
+    //ï¿½Ó´ï¿½Ð¡ï¿½ï¿½
     //sort(candidateSet.cans.begin(), candidateSet.cans.end(),greater<float>());
 
-    //ÈôembeddingÏà½»µÄÖµ¿É¿¿£¬candidateµÄË³Ðò¾ÍÊÇÏàËÆ¶ÈµÄË³Ðò
-    //µ«embeddingÒ»¶¨ÓÐÎó²î£¬¼ÓÈëÒ»¸ö¹À¼ÆÏµÊý£¬¼ÆËãÇ°lambda*k¸öcans
+    //ï¿½ï¿½embeddingï¿½à½»ï¿½ï¿½Öµï¿½É¿ï¿½ï¿½ï¿½candidateï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶Èµï¿½Ë³ï¿½ï¿½
+    //ï¿½ï¿½embeddingÒ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½î£¬ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°lambda*kï¿½ï¿½cans
     for (size_t i = 0; i < ceil(lambdaK*k); i++)
     {
         resultData result;
@@ -383,14 +385,14 @@ void Vars::rangeSearch(int id, int qID)
     resultSet.qID = qID;
     //Search Candidates for qi
     
-    //ºòÑ¡°´ÕÕembedÏà½»µÄ´óÐ¡ÅÅÐò
-    //´ÓÐ¡µ½´óÅÅ,logÕýÔò»¯Ö®ºó£¬ÖµÔ½Ð¡Ô½ÏàËÆ
+    //ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½embedï¿½à½»ï¿½Ä´ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½
+    //ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,logï¿½ï¿½ï¿½ï¿½Ö®ï¿½ï¿½ÖµÔ½Ð¡Ô½ï¿½ï¿½ï¿½ï¿½
     sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
-    //´Ó´óµ½Ð¡ÅÅ
+    //ï¿½Ó´ï¿½Ð¡ï¿½ï¿½
     //sort(candidateSet.cans.begin(), candidateSet.cans.end(),greater<float>());
 
-    //ÈôembeddingÏà½»µÄÖµ¿É¿¿£¬candidateµÄË³Ðò¾ÍÊÇÏàËÆ¶ÈµÄË³Ðò
-    //µ«embeddingÒ»¶¨ÓÐÎó²î£¬¼ÓÈëÒ»¸ö¹À¼ÆÏµÊý£¬ÕÒµ½Ð¡ÓÚrangeµÄ²ÎÊýºó£¬ÔÙ¼ÌÐø¼ÆËãlambda*i¸öcans
+    //ï¿½ï¿½embeddingï¿½à½»ï¿½ï¿½Öµï¿½É¿ï¿½ï¿½ï¿½candidateï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶Èµï¿½Ë³ï¿½ï¿½
+    //ï¿½ï¿½embeddingÒ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½î£¬ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½Òµï¿½Ð¡ï¿½ï¿½rangeï¿½Ä²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lambda*iï¿½ï¿½cans
     int sizeR = (int)embeddings.size();
     for (size_t i = 0; i < sizeR; i++)
     {
@@ -400,7 +402,7 @@ void Vars::rangeSearch(int id, int qID)
                
         if (result.similarity >= range)
             resultSet.res.push_back(result);
-        else//ÔÙ¼ÌÐø¼ÆËãlambda*i¸öcans
+        else//ï¿½Ù¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lambda*iï¿½ï¿½cans
             sizeR = (int)ceil(lambdaRange * i);
 
     }
@@ -416,7 +418,7 @@ void CPUmain(char* argv[])
     vars.ReadEmbData();
     vars.ShowPara();
 
-    //È¡QNums¸öËæ»ú¼ÇÂ¼×÷Îª²éÑ¯Q
+    //È¡QNumsï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½Îªï¿½ï¿½Ñ¯Q
     srand((unsigned)2024);
     vector<int> qIDs;
     for (size_t n = 0; n < vars.QNums; n++)
