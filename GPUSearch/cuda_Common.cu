@@ -1,4 +1,4 @@
-#include "cuda_Header.cuh"
+ï»¿#include "cuda_Header.cuh"
 #include "cuda_Error.cuh"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -13,7 +13,7 @@
 
 using namespace std;
 
-//ÏòÁ¿Ïà¼Ó
+//å‘é‡ç›¸åŠ 
 __global__ void AddKernel(float* a, float* b, float* c, int n)
 {
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
@@ -25,27 +25,27 @@ __global__ void AddKernel(float* a, float* b, float* c, int n)
 	}
 }
 
-// ¾ØÕóÀàĞÍ£¬ĞĞÓÅÏÈ£¬M(row, col) = *(M.elements + row * M.width + col)
+// çŸ©é˜µç±»å‹ï¼Œè¡Œä¼˜å…ˆï¼ŒM(row, col) = *(M.elements + row * M.width + col)
 struct Matrix
 {
-	int width;//ĞĞ¿í
-	int height;//ÁĞ¸ß
+	int width;//è¡Œå®½
+	int height;//åˆ—é«˜
 	float* elements;
 };
 
-// »ñÈ¡¾ØÕóAµÄ(row, col)ÔªËØ
+// è·å–çŸ©é˜µAçš„(row, col)å…ƒç´ 
 __device__ float getElement(Matrix* A, int row, int col)
 {
 	return A->elements[row * A->width + col];
 }
 
-// Îª¾ØÕóAµÄ(row, col)ÔªËØ¸³Öµ
+// ä¸ºçŸ©é˜µAçš„(row, col)å…ƒç´ èµ‹å€¼
 __device__ void setElement(Matrix* A, int row, int col, float value)
 {
 	A->elements[row * A->width + col] = value;
 }
 
-// ¾ØÕóÏà³Ëkernel£¬2-D£¬Ã¿¸öÏß³Ì¼ÆËãÒ»¸öÔªËØ
+// çŸ©é˜µç›¸ä¹˜kernelï¼Œ2-Dï¼Œæ¯ä¸ªçº¿ç¨‹è®¡ç®—ä¸€ä¸ªå…ƒç´ 
 __global__ void matMulKernel(Matrix* A, Matrix* B, Matrix* C)
 {
 	float Cvalue = 0.0;
@@ -58,48 +58,47 @@ __global__ void matMulKernel(Matrix* A, Matrix* B, Matrix* C)
 	setElement(C, row, col, Cvalue);
 }
 
-//¼ÆËãBox-EmbeddingÏà½»µÄ´óĞ¡
+//è®¡ç®—Box-Embeddingç›¸äº¤çš„å¤§å°
 __global__ void ComputeKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int N)
 {
-    float Cvalue = 1.0;//ºóĞøÏà³Ë£¬³õÊ¼±ØĞëÎª1
+    double Cvalue = 1.0;//åç»­ç›¸ä¹˜ï¼Œåˆå§‹å¿…é¡»ä¸º1
 
-    int strade = blockDim.x * gridDim.x;//Ìø²½µÄ´óĞ¡£¬µÈÓÚÏß³ÌµÄ¿í
+    int strade = blockDim.x * gridDim.x;//è·³æ­¥çš„å¤§å°ï¼Œç­‰äºçº¿ç¨‹çš„å®½
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,¼´ĞĞÊı£¬rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,¼´ÁĞÊı, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,å³è¡Œæ•°ï¼ŒrowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,å³åˆ—æ•°, rowA=colC
     int rowA = colC;
 
     int step = dim / 2;
-    //Ìø²½Ñ­»·£¬Ö±µ½±éÀúËùÓĞÊı¾İN£¬Ôòkernel¶ÔÈÎÒâ³¤¶ÈµÄN¶¼¿ÉÒÔÊµÊ©
+    //è·³æ­¥å¾ªç¯ï¼Œç›´åˆ°éå†æ‰€æœ‰æ•°æ®Nï¼Œåˆ™kernelå¯¹ä»»æ„é•¿åº¦çš„Néƒ½å¯ä»¥å®æ–½
     while (colC < N)
     {        
         for (int d = 0; d < step; d++)
         {
-            //¼ÆËãÃ¿¸öÎ¬¶ÈAºÍBµÄbox-embeddingÏà½»µÄ´óĞ¡
-            double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //ºó°ëÔªËØ
-                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //Ç°°ëÔªËØ
-            //ĞèÒªÃ¿¸öÎ¬¶È¶¼´óÓÚ0
-            if (tmp <= 0)//²¢ĞĞÏß³ÌÄÚµÄÅĞ¶ÏÓ°ÏìÍ¬²½£¬¾¡Á¿¼õÉÙif·ÖÖ§
+            //è®¡ç®—æ¯ä¸ªç»´åº¦Aå’ŒBçš„box-embeddingç›¸äº¤çš„å¤§å°
+            double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //ååŠå…ƒç´ 
+                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //å‰åŠå…ƒç´ 
+            //éœ€è¦æ¯ä¸ªç»´åº¦éƒ½å¤§äº0
+            if (tmp <= 0)//å¹¶è¡Œçº¿ç¨‹å†…çš„åˆ¤æ–­å½±å“åŒæ­¥ï¼Œå°½é‡å‡å°‘ifåˆ†æ”¯
             {
                 Cvalue = -1.0;
                 //break;
             }
             else
-            {    ////Cvalue *= tmp;//Ğ¡Êı¶à´ÎÏà³Ë»áµ¼ÖÂÊıÖµ½Ó½ü0£¬ÊıÖµÏûÊ§vanishing£¬Ğè×öÕıÔò»¯Normalization
-                // logÕıÔò»¯£¬ÏÈÏà¼Ó£¬ºóÈ¡¶ÔÊı
-                Cvalue +=tmp;
+            {    ////Cvalue *= tmp;//å°æ•°å¤šæ¬¡ç›¸ä¹˜ä¼šå¯¼è‡´æ•°å€¼æ¥è¿‘0ï¼Œæ•°å€¼æ¶ˆå¤±vanishingï¼Œéœ€åšæ­£åˆ™åŒ–Normalization
+                // logæ­£åˆ™åŒ–
+                Cvalue *= abs(log10(tmp));
             }
         }
-        Cvalue = (float)abs(log10(Cvalue));
-        //CvaluesµÄzÕıÔò»¯Z-Normalization
-        //¾ùÖµ
+        //Cvaluesçš„zæ­£åˆ™åŒ–Z-Normalization
+        //å‡å€¼
         //double mean = 0;
         //for (size_t i = 0; i < Cvalues.size(); i++)
         //{
         //    mean += Cvalues[i];
         //}
         //mean = mean / Cvalues.size();
-        ////·½²î
+        ////æ–¹å·®
         //double vari = 0;
         //for (size_t i = 0; i < Cvalues.size(); i++)
         //{
@@ -108,29 +107,29 @@ __global__ void ComputeKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int N)
         //vari = vari / Cvalues.size();
 
         setElement(C, rowC, colC, Cvalue);
-        colC += strade;//Ìø²½
+        colC += strade;//è·³æ­¥
     }
 }
 
-//Ïß³Ì×ã¹»Ê±£¬ÎŞÌø²½Ñ­»·
+//çº¿ç¨‹è¶³å¤Ÿæ—¶ï¼Œæ— è·³æ­¥å¾ªç¯
 __global__ void ComputeKernel2(Matrix* R, Matrix* Q, Matrix* C, int dim)
 {
-    double Cvalue = 1.0;//ºóĞøÏà³Ë£¬³õÊ¼±ØĞëÎª1
+    double Cvalue = 1.0;//åç»­ç›¸ä¹˜ï¼Œåˆå§‹å¿…é¡»ä¸º1
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,¼´ĞĞÊı£¬rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,¼´ÁĞÊı, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,å³è¡Œæ•°ï¼ŒrowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,å³åˆ—æ•°, rowA=colC
     int rowA = colC;
     int step = dim / 2;
     
     for (int d = 0; d < step; d++)
     {
-        //¼ÆËãÃ¿¸öÎ¬¶ÈAºÍBµÄbox-embeddingÏà½»µÄ´óĞ¡
-        double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //ºó°ëÔªËØ
-            - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //Ç°°ëÔªËØ
+        //è®¡ç®—æ¯ä¸ªç»´åº¦Aå’ŒBçš„box-embeddingç›¸äº¤çš„å¤§å°
+        double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //ååŠå…ƒç´ 
+            - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //å‰åŠå…ƒç´ 
 
-        //ĞèÒªÃ¿¸öÎ¬¶È¶¼´óÓÚ0,
-        //Cvalue *= tmp;//Ğ¡Êı¶à´ÎÏà³Ë»áµ¼ÖÂÊıÖµ½Ó½ü0£¬ÊıÖµÏûÊ§vanishing£¬Ğè×öÕıÔò»¯Normalization
-        // logÕıÔò»¯,ÇÒlogÖ®ºó£¬tmpĞ¡ÓÚÁã»áµÃµ½nan
+        //éœ€è¦æ¯ä¸ªç»´åº¦éƒ½å¤§äº0,
+        //Cvalue *= tmp;//å°æ•°å¤šæ¬¡ç›¸ä¹˜ä¼šå¯¼è‡´æ•°å€¼æ¥è¿‘0ï¼Œæ•°å€¼æ¶ˆå¤±vanishingï¼Œéœ€åšæ­£åˆ™åŒ–Normalization
+        // logæ­£åˆ™åŒ–,ä¸”logä¹‹åï¼Œtmpå°äºé›¶ä¼šå¾—åˆ°nan
         Cvalue *= abs(log10(tmp));
 
     }
@@ -139,21 +138,21 @@ __global__ void ComputeKernel2(Matrix* R, Matrix* Q, Matrix* C, int dim)
 
 __global__ void SingleQueryKernel(Matrix* R, float* Q, float* C, int dim)
 {
-    float Cvalue = 1.0f;//ºóĞøÏà³Ë£¬³õÊ¼±ØĞëÎª1
+    float Cvalue = 1.0f;//åç»­ç›¸ä¹˜ï¼Œåˆå§‹å¿…é¡»ä¸º1
 
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,¼´ÁĞÊı, rowA=colC 64*32=2048
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,å³åˆ—æ•°, rowA=colC 64*32=2048
     int rowA = colC;
     int step = dim / 2;
 
     for (int d = 0; d < step; d++)
     {
-        //¼ÆËãÃ¿¸öÎ¬¶ÈAºÍBµÄbox-embeddingÏà½»µÄ´óĞ¡
-        float tmp = min(R->elements[rowA * R->width + d + step], Q[d + step])       //ºó°ëÔªËØ
-            - max(R->elements[rowA * R->width + d], Q[d]);                          //Ç°°ëÔªËØ
+        //è®¡ç®—æ¯ä¸ªç»´åº¦Aå’ŒBçš„box-embeddingç›¸äº¤çš„å¤§å°
+        float tmp = min(R->elements[rowA * R->width + d + step], Q[d + step])       //ååŠå…ƒç´ 
+            - max(R->elements[rowA * R->width + d], Q[d]);                          //å‰åŠå…ƒç´ 
 
-        //ĞèÒªÃ¿¸öÎ¬¶È¶¼´óÓÚ0
+        //éœ€è¦æ¯ä¸ªç»´åº¦éƒ½å¤§äº0
         Cvalue *= abs(log10(tmp));
-        //if (tmp < 0)//²¢ĞĞÏß³ÌÄÚµÄÅĞ¶ÏÓ°ÏìÍ¬²½£¬¾¡Á¿¼õÉÙif·ÖÖ§
+        //if (tmp < 0)//å¹¶è¡Œçº¿ç¨‹å†…çš„åˆ¤æ–­å½±å“åŒæ­¥ï¼Œå°½é‡å‡å°‘ifåˆ†æ”¯
         //{
         //    Cvalue = -1.0f;
         //    //break;
@@ -163,65 +162,65 @@ __global__ void SingleQueryKernel(Matrix* R, float* Q, float* C, int dim)
         //    Cvalue = 0;
         //}
         //else
-        //{   //logÕıÔò»¯
+        //{   //logæ­£åˆ™åŒ–
         //    Cvalue *= abs(log10(tmp));
         //}
     }
     C[colC]=Cvalue;
 }
 
-//»ñÈ¡GPUĞÅÏ¢
+//è·å–GPUä¿¡æ¯
 void getCudaInformaton()
 {
 	int dev = 0;
 	cudaDeviceProp devProp;
 	CHECK(cudaGetDeviceProperties(&devProp, dev));
-	std::cout << "Ê¹ÓÃGPU device " << dev << ": " << devProp.name << std::endl;
-	std::cout << "SMµÄÊıÁ¿£º" << devProp.multiProcessorCount << std::endl;
-	std::cout << "Ã¿¸öÏß³Ì¿éµÄ¹²ÏíÄÚ´æ´óĞ¡£º" << devProp.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
-	std::cout << "Ã¿¸öÏß³Ì¿éµÄ×î´óÏß³ÌÊı£º" << devProp.maxThreadsPerBlock << std::endl;
-	std::cout << "Ã¿¸öSMµÄ×î´óÏß³ÌÊı£º" << devProp.maxThreadsPerMultiProcessor << std::endl;
-	std::cout << "Ã¿¸öSMµÄ×î´óÏß³ÌÊøÊı£º" << devProp.maxThreadsPerMultiProcessor / 32 << std::endl;
+	std::cout << "ä½¿ç”¨GPU device " << dev << ": " << devProp.name << std::endl;
+	std::cout << "SMçš„æ•°é‡ï¼š" << devProp.multiProcessorCount << std::endl;
+	std::cout << "æ¯ä¸ªçº¿ç¨‹å—çš„å…±äº«å†…å­˜å¤§å°ï¼š" << devProp.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
+	std::cout << "æ¯ä¸ªçº¿ç¨‹å—çš„æœ€å¤§çº¿ç¨‹æ•°ï¼š" << devProp.maxThreadsPerBlock << std::endl;
+	std::cout << "æ¯ä¸ªSMçš„æœ€å¤§çº¿ç¨‹æ•°ï¼š" << devProp.maxThreadsPerMultiProcessor << std::endl;
+	std::cout << "æ¯ä¸ªSMçš„æœ€å¤§çº¿ç¨‹æŸæ•°ï¼š" << devProp.maxThreadsPerMultiProcessor / 32 << std::endl;
 
     int dev1 = 1;
     cudaDeviceProp devProp1;
     CHECK(cudaGetDeviceProperties(&devProp1, dev1));
-    std::cout << "Ê¹ÓÃGPU device " << dev1 << ": " << devProp1.name << std::endl;
-    std::cout << "SMµÄÊıÁ¿£º" << devProp1.multiProcessorCount << std::endl;
-    std::cout << "Ã¿¸öÏß³Ì¿éµÄ¹²ÏíÄÚ´æ´óĞ¡£º" << devProp1.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
-    std::cout << "Ã¿¸öÏß³Ì¿éµÄ×î´óÏß³ÌÊı£º" << devProp1.maxThreadsPerBlock << std::endl;
-    std::cout << "Ã¿¸öSMµÄ×î´óÏß³ÌÊı£º" << devProp1.maxThreadsPerMultiProcessor << std::endl;
-    std::cout << "Ã¿¸öSMµÄ×î´óÏß³ÌÊøÊı£º" << devProp1.maxThreadsPerMultiProcessor / 32 << std::endl;
+    std::cout << "ä½¿ç”¨GPU device " << dev1 << ": " << devProp1.name << std::endl;
+    std::cout << "SMçš„æ•°é‡ï¼š" << devProp1.multiProcessorCount << std::endl;
+    std::cout << "æ¯ä¸ªçº¿ç¨‹å—çš„å…±äº«å†…å­˜å¤§å°ï¼š" << devProp1.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
+    std::cout << "æ¯ä¸ªçº¿ç¨‹å—çš„æœ€å¤§çº¿ç¨‹æ•°ï¼š" << devProp1.maxThreadsPerBlock << std::endl;
+    std::cout << "æ¯ä¸ªSMçš„æœ€å¤§çº¿ç¨‹æ•°ï¼š" << devProp1.maxThreadsPerMultiProcessor << std::endl;
+    std::cout << "æ¯ä¸ªSMçš„æœ€å¤§çº¿ç¨‹æŸæ•°ï¼š" << devProp1.maxThreadsPerMultiProcessor / 32 << std::endl;
 }
 
 void CUDASingleQuery(char* argv[])
 {
-    //¶ÁÊı¾İ
+    //è¯»æ•°æ®
     Vars vars;
     vars.ReadPara(argv);
     vars.ReadOrgTextData();
     vars.ReadEmbData();
     vars.ShowPara();
 
-    //ÒÔÊä³ö¾ØÕóµÄ¸ß¡¢¿íÎª»ù×¼
-    int height = 1;    //Êä³öµÄ¸ßÎª²éÑ¯µÄÊıÁ¿|q|=Qnums£¬µ¥²éÑ¯ÔòÎª1£¬¶à¸ö²éÑ¯ÔòÎªn
-    int width = vars.EmbNums;   //Êä³öµÄ¿íÎª¼ÇÂ¼µÄÊıÁ¿N£¬QNumsÈô´óÓÚ×ÜÏß³ÌÊı£¬ÔòÌø²½Ñ­»·
-    int dim = vars.Dim;         //embeddingÎ¬¶ÈD
-    //¾ØÕóRecords[N*D],
+    //ä»¥è¾“å‡ºçŸ©é˜µçš„é«˜ã€å®½ä¸ºåŸºå‡†
+    int height = 1;    //è¾“å‡ºçš„é«˜ä¸ºæŸ¥è¯¢çš„æ•°é‡|q|=Qnumsï¼Œå•æŸ¥è¯¢åˆ™ä¸º1ï¼Œå¤šä¸ªæŸ¥è¯¢åˆ™ä¸ºn
+    int width = vars.EmbNums;   //è¾“å‡ºçš„å®½ä¸ºè®°å½•çš„æ•°é‡Nï¼ŒQNumsè‹¥å¤§äºæ€»çº¿ç¨‹æ•°ï¼Œåˆ™è·³æ­¥å¾ªç¯
+    int dim = vars.Dim;         //embeddingç»´åº¦D
+    //çŸ©é˜µRecords[N*D],
     Matrix* R;
     //Query[1*D],Candidates[1*N]
     float* Q; float* C;
 
-    // ÉêÇëÍĞ¹ÜÄÚ´æ³õÊ¼»¯
+    // ç”³è¯·æ‰˜ç®¡å†…å­˜åˆå§‹åŒ–
     cudaMallocManaged((void**)&R, sizeof(Matrix));
     cudaMallocManaged((void**)&Q, sizeof(float));
     cudaMallocManaged((void**)&C, sizeof(float));
 
-    // ³õÊ¼»¯Êı¾İR 
-    R->width = dim;        //RµÄ¿íÎªembeddingµÄÎ¬¶ÈD
-    R->height = width;     //RµÄ¸ßÎª¼ÇÂ¼µÄÊıÁ¿N
+    //åˆå§‹åŒ–æ•°æ®R 
+    R->width = dim;        //Rçš„å®½ä¸ºembeddingçš„ç»´åº¦D
+    R->height = width;     //Rçš„é«˜ä¸ºè®°å½•çš„æ•°é‡N
 
-    //ÉêÇëÍĞ¹ÜÄÚ´æ
+    //ç”³è¯·æ‰˜ç®¡å†…å­˜
     int R_Bytes = R->width * R->height * sizeof(float);
     int Q_Bytes = dim * sizeof(float);
     int C_Bytes = width * sizeof(float);
@@ -229,30 +228,30 @@ void CUDASingleQuery(char* argv[])
     cudaMallocManaged((void**)&Q, Q_Bytes);
     cudaMallocManaged((void**)&C, C_Bytes);
 
-    //È¡1¸öËæ»ú¼ÇÂ¼×÷Îª²éÑ¯Q,ÈôÎªjionÎÊÌâ£¬R×Ô½»£¬Q=R
+    //å–1ä¸ªéšæœºè®°å½•ä½œä¸ºæŸ¥è¯¢Q,è‹¥ä¸ºjioné—®é¢˜ï¼ŒRè‡ªäº¤ï¼ŒQ=R
     srand((unsigned)2024);
     int qid = rand() % vars.EmbNums;
     for (size_t j = 0; j < dim; j++)
     {
-        Q[j] = vars.embeddings[qid][j];//qidĞĞjÁĞµÄÖµ
+        Q[j] = vars.embeddings[qid][j];//qidè¡Œjåˆ—çš„å€¼
         cout << j << ";" << Q[j] << std::endl;
     }
 
-    //Êı¾İR¼ÓÔØ
+    //æ•°æ®RåŠ è½½
     for (size_t i = 0; i < R->height; i++)
     {
         for (size_t j = 0; j < R->width; j++)
         {
-            R->elements[i * R->width + j] = vars.embeddings[i][j];//iĞĞjÁĞµÄÖµ
+            R->elements[i * R->width + j] = vars.embeddings[i][j];//iè¡Œjåˆ—çš„å€¼
         }
     }
 
-    //Ò»Î¬µÄgirdºÍblock
+    //ä¸€ç»´çš„girdå’Œblock
     dim3 blockSize(64);
     dim3 gridSize((width+ blockSize.x -1)/blockSize.x);
 
     SingleQueryKernel << < gridSize, blockSize >> > (R, Q, C, dim);
-    // Í¬²½device ±£Ö¤½á¹ûÄÜÕıÈ··ÃÎÊ
+    // åŒæ­¥device ä¿è¯ç»“æœèƒ½æ­£ç¡®è®¿é—®
     cudaDeviceSynchronize();
 
     for (size_t i = 0; i < width; i++)
@@ -263,37 +262,37 @@ void CUDASingleQuery(char* argv[])
 
 void CUDACompute(char* argv[])
 {
-    //¶ÁÊı¾İ
+    //è¯»æ•°æ®
     Vars vars;
     vars.ReadPara(argv);    
     vars.ReadOrgTextData();
     vars.ReadEmbData();
     vars.ShowPara();
     
-    //ÒÔÊä³ö¾ØÕóµÄ¸ß¡¢¿íÎª»ù×¼
-    int height = vars.QNums;    //Êä³öµÄ¸ßÎª²éÑ¯µÄÊıÁ¿|q|=Qnums£¬µ¥²éÑ¯ÔòÎª1£¬¶à¸ö²éÑ¯ÔòÎªn
-    int width = vars.EmbNums;   //Êä³öµÄ¿íÎª¼ÇÂ¼µÄÊıÁ¿N£¬QNumsÈô´óÓÚ×ÜÏß³ÌÊı£¬ÔòÌø²½Ñ­»·
-    int dim = vars.Dim;         //embeddingÎ¬¶ÈD
-    //¾ØÕóRecords[N*D],Query[|q|*D],Candidates[|q|*N]
+    //ä»¥è¾“å‡ºçŸ©é˜µçš„é«˜ã€å®½ä¸ºåŸºå‡†
+    int height = vars.QNums;    //è¾“å‡ºçš„é«˜ä¸ºæŸ¥è¯¢çš„æ•°é‡|q|=Qnumsï¼Œå•æŸ¥è¯¢åˆ™ä¸º1ï¼Œå¤šä¸ªæŸ¥è¯¢åˆ™ä¸ºn
+    int width = vars.EmbNums;   //è¾“å‡ºçš„å®½ä¸ºè®°å½•çš„æ•°é‡Nï¼ŒQNumsè‹¥å¤§äºæ€»çº¿ç¨‹æ•°ï¼Œåˆ™è·³æ­¥å¾ªç¯
+    int dim = vars.Dim;         //embeddingç»´åº¦D
+    //çŸ©é˜µRecords[N*D],Query[|q|*D],Candidates[|q|*N]
     Matrix* R, * Q, * C;
-    // ÉêÇëÍĞ¹ÜÄÚ´æ
+    // ç”³è¯·æ‰˜ç®¡å†…å­˜
     cudaMallocManaged((void**)&R, sizeof(Matrix));
     cudaMallocManaged((void**)&Q, sizeof(Matrix));
     cudaMallocManaged((void**)&C, sizeof(Matrix));
     
-    // ³õÊ¼»¯Êı¾İR 
-    R->width = dim;        //RµÄ¿íÎªembeddingµÄÎ¬¶ÈD
-    R->height = width;     //RµÄ¸ßÎª¼ÇÂ¼µÄÊıÁ¿N
+    // åˆå§‹åŒ–æ•°æ®R 
+    R->width = dim;        //Rçš„å®½ä¸ºembeddingçš„ç»´åº¦D
+    R->height = width;     //Rçš„é«˜ä¸ºè®°å½•çš„æ•°é‡N
    
-    // ³õÊ¼»¯Êı¾İQ 
-    Q->width = dim;         //QµÄ¿íÎªembeddingµÄÎ¬¶ÈD
-    Q->height = height;     //QµÄ¸ßÎª²éÑ¯µÄÊıÁ¿|q|
+    // åˆå§‹åŒ–æ•°æ®Q 
+    Q->width = dim;         //Qçš„å®½ä¸ºembeddingçš„ç»´åº¦D
+    Q->height = height;     //Qçš„é«˜ä¸ºæŸ¥è¯¢çš„æ•°é‡|q|
     
-    // ³õÊ¼»¯Êı¾İC
-    C->height = height;     //CµÄ¸ßÎª²éÑ¯µÄÊıÁ¿|q|
-    C->width = width;       //CµÄ¿íÎª¼ÇÂ¼µÄÊıÁ¿N
+    // åˆå§‹åŒ–æ•°æ®C
+    C->height = height;     //Cçš„é«˜ä¸ºæŸ¥è¯¢çš„æ•°é‡|q|
+    C->width = width;       //Cçš„å®½ä¸ºè®°å½•çš„æ•°é‡N
 
-    //È¡QNums¸öËæ»ú¼ÇÂ¼×÷Îª²éÑ¯Q,ÈôÎªjionÎÊÌâ£¬R×Ô½»£¬Q=R
+    //å–QNumsä¸ªéšæœºè®°å½•ä½œä¸ºæŸ¥è¯¢Q,è‹¥ä¸ºjioné—®é¢˜ï¼ŒRè‡ªäº¤ï¼ŒQ=R
     srand((unsigned)2024);
     vector<int> queries;
     for (size_t n = 0; n < vars.QNums; n++)
@@ -303,7 +302,7 @@ void CUDACompute(char* argv[])
         //cout << "QID = " << qid << endl;
     }
 
-    //ÉêÇëÍĞ¹ÜÄÚ´æ
+    //ç”³è¯·æ‰˜ç®¡å†…å­˜
     int R_Bytes = R->width * R->height * sizeof(float);
     int Q_Bytes = Q->width * Q->height * sizeof(float);
     int C_Bytes = C->width * C->height * sizeof(float);
@@ -313,16 +312,16 @@ void CUDACompute(char* argv[])
 
     clock_t start, end;
     start = clock();
-    //Êı¾İ¼ÓÔØ£¬R£¬Q·Ö¿ª¼ÓÔØ£¬QÔÚR¼ÓÔØµÄ¹ı³ÌÖĞ¼ÓÔØ»á±äÂı£¡
-    //Êı¾İR¼ÓÔØ,Êı¾İ¼ÓÔØ±ØĞëÔÚÉêÇëÄÚ´æÍĞ¹ÜÖ®ºó£¬·ñÔòÎŞ·¨¼ÓÔØµ½GPU
+    //æ•°æ®åŠ è½½ï¼ŒRï¼ŒQåˆ†å¼€åŠ è½½ï¼ŒQåœ¨RåŠ è½½çš„è¿‡ç¨‹ä¸­åŠ è½½ä¼šå˜æ…¢ï¼
+    //æ•°æ®RåŠ è½½,æ•°æ®åŠ è½½å¿…é¡»åœ¨ç”³è¯·å†…å­˜æ‰˜ç®¡ä¹‹åï¼Œå¦åˆ™æ— æ³•åŠ è½½åˆ°GPU
     for (size_t i = 0; i < R->height; i++)
     {
         for (size_t j = 0; j < R->width; j++)
         {
-            R->elements[i * R->width + j] = vars.embeddings[i][j];//iĞĞjÁĞµÄÖµ
+            R->elements[i * R->width + j] = vars.embeddings[i][j];//iè¡Œjåˆ—çš„å€¼
         }
     }
-    //Êı¾İQ¼ÓÔØ
+    //æ•°æ®QåŠ è½½
     sort(queries.begin(), queries.end());
     int q0id = 42;
     for (size_t i = 0; i < Q->height; i++)
@@ -332,30 +331,30 @@ void CUDACompute(char* argv[])
             q0id = (int)i;
         for (size_t j = 0; j < Q->width; j++)
         {
-            Q->elements[i * Q->width + j] = vars.embeddings[qid][j];//qidĞĞjÁĞµÄÖµ
+            Q->elements[i * Q->width + j] = vars.embeddings[qid][j];//qidè¡Œjåˆ—çš„å€¼
         }
     }
     end = clock();
     cout << "LoadDataToGPUtime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
 
-    //SMµÄÊıÁ¿£º10
-    //Ã¿¸öÏß³Ì¿éµÄ¹²ÏíÄÚ´æ´óĞ¡£º48 KB
-    //Ã¿¸öÏß³Ì¿éµÄ×î´óÏß³ÌÊı£º1024
-    //Ã¿¸öSMµÄ×î´óÏß³ÌÊı£º2048
-    //Ã¿¸öSMµÄ×î´óÏß³ÌÊøÊı£º64
-    //¶¨ÒåkernelµÄÖ´ĞĞÅäÖÃ
+    //SMçš„æ•°é‡ï¼š10
+    //æ¯ä¸ªçº¿ç¨‹å—çš„å…±äº«å†…å­˜å¤§å°ï¼š48 KB
+    //æ¯ä¸ªçº¿ç¨‹å—çš„æœ€å¤§çº¿ç¨‹æ•°ï¼š1024
+    //æ¯ä¸ªSMçš„æœ€å¤§çº¿ç¨‹æ•°ï¼š2048
+    //æ¯ä¸ªSMçš„æœ€å¤§çº¿ç¨‹æŸæ•°ï¼š64
+    //å®šä¹‰kernelçš„æ‰§è¡Œé…ç½®
     int blockx, blocky, gridx, gridy;
-    blocky = 32;//¸ß£¬ÉèÖÃÎªQnumµÄ×î´ó¹«Òò×Ó 
-    blockx = 32;//¿í£¬blockx*blockyÊÇ32µÄ±¶Êı£¬²»Ğ¡ÓÚ64£¬²»´óÓÚ1024       
-    gridy = (height + blocky - 1) / blocky;//¸ß£¬¹Ì¶¨Îªgridy*blocky=QnumµÄ³¤¶È£¬gridy<2^31-1  
-    gridx = (width + blockx - 1) / blockx;//¿í£¬gridx*gridy×îºÃÎªsmµÄ±¶Êı2±¶ÒÔÉÏ£¬ÇÒÎª32µÄ±¶Êı£¬Êµ¼ÊÊı¾İ²»»á×ÜÊÇ32µÄ±¶Êı
+    blocky = 32;//é«˜ï¼Œè®¾ç½®ä¸ºQnumçš„æœ€å¤§å…¬å› å­ 
+    blockx = 32;//å®½ï¼Œblockx*blockyæ˜¯32çš„å€æ•°ï¼Œä¸å°äº64ï¼Œä¸å¤§äº1024       
+    gridy = (height + blocky - 1) / blocky;//é«˜ï¼Œå›ºå®šä¸ºgridy*blocky=Qnumçš„é•¿åº¦ï¼Œgridy<2^31-1  
+    gridx = (width + blockx - 1) / blockx;//å®½ï¼Œgridx*gridyæœ€å¥½ä¸ºsmçš„å€æ•°2å€ä»¥ä¸Šï¼Œä¸”ä¸º32çš„å€æ•°ï¼Œå®é™…æ•°æ®ä¸ä¼šæ€»æ˜¯32çš„å€æ•°
     dim3 blockSize(blockx, blocky);//[32,32]
     dim3 gridSize(gridx, gridy);//[28, Qnums/32]
 
-    //Ö´ĞĞkernel//ºöÂÔ´íÎóÌáÊ¾
+    //æ‰§è¡Œkernel//å¿½ç•¥é”™è¯¯æç¤º
     ComputeKernel << < gridSize, blockSize >> > (R, Q, C, dim, width);
     //ComputeKernel2 << < gridSize, blockSize >> > (R, Q, C, dim);
-    // Í¬²½device ±£Ö¤½á¹ûÄÜÕıÈ··ÃÎÊ
+    // åŒæ­¥device ä¿è¯ç»“æœèƒ½æ­£ç¡®è®¿é—®
     cudaDeviceSynchronize();
     
     //for (size_t i = 0; i < C->width; i++)
@@ -363,7 +362,7 @@ void CUDACompute(char* argv[])
     //    //C(row, col) = *(C.elements + row * C.width + col)
     //    if (C->elements[q0id*C->width + i]!=NULL)
     //    {
-    //        std::cout << "ID£º" << i << ";" << C->elements[q0id * C->width + i] << std::endl;
+    //        std::cout << "IDï¼š" << i << ";" << C->elements[q0id * C->width + i] << std::endl;
     //    }
     //    
     //}
@@ -396,34 +395,34 @@ void CUDACompute(char* argv[])
             vars.rangeSearch((int)i,queries[i]);
     }
  
-    //    ID£º0; 3.13513
-    //    ID£º1; 0.123433
-    //    ID£º2; 0.64123
-    //    ID£º3; 0.0110187
-    //    ID£º4; 0.0161557
-    //    ID£º5; 8.66706e-05
-    //    ID£º6; 15461.4
-    //    ID£º16; 0.000491897
-    //    ID£º17; 0.000741085
-    //    ID£º24; 0.565358
-    //    ID£º26; 4.15953
-    //    ID£º27; 0.00755924
+    //    IDï¼š0; 3.13513
+    //    IDï¼š1; 0.123433
+    //    IDï¼š2; 0.64123
+    //    IDï¼š3; 0.0110187
+    //    IDï¼š4; 0.0161557
+    //    IDï¼š5; 8.66706e-05
+    //    IDï¼š6; 15461.4
+    //    IDï¼š16; 0.000491897
+    //    IDï¼š17; 0.000741085
+    //    IDï¼š24; 0.565358
+    //    IDï¼š26; 4.15953
+    //    IDï¼š27; 0.00755924
     // 
-    //    ID£º2401; 0.065052
-    //    ID£º2402; -1
-    //    ID£º2403; 0.116964
-    //    ID£º2404; 0.579599
-    //    ID£º2405; 0.00066764
-    //    ID£º2406; 0.0495014
-    //    ID£º2407; -1
-    //    ID£º2408; 0.0199137
-    //    ID£º2409; 6.76879
-    //    ID£º2410; -1
-    //    ID£º2411; -1
-    //    ID£º2412; 0.279201
-    //    ID£º2413; -1
-    //    ID£º2414; 0.00328183
-    //    ID£º2415; 0.00267098
+    //    IDï¼š2401; 0.065052
+    //    IDï¼š2402; -1
+    //    IDï¼š2403; 0.116964
+    //    IDï¼š2404; 0.579599
+    //    IDï¼š2405; 0.00066764
+    //    IDï¼š2406; 0.0495014
+    //    IDï¼š2407; -1
+    //    IDï¼š2408; 0.0199137
+    //    IDï¼š2409; 6.76879
+    //    IDï¼š2410; -1
+    //    IDï¼š2411; -1
+    //    IDï¼š2412; 0.279201
+    //    IDï¼š2413; -1
+    //    IDï¼š2414; 0.00328183
+    //    IDï¼š2415; 0.00267098
     return;
 }
 
@@ -433,7 +432,7 @@ void CUDA_main()
     int width = 1024;
     int height = 1024;
     Matrix* A, * B, * C;
-    // ÉêÇëÍĞ¹ÜÄÚ´æ
+    // ç”³è¯·æ‰˜ç®¡å†…å­˜
     cudaMallocManaged((void**)&A, sizeof(Matrix));
     cudaMallocManaged((void**)&B, sizeof(Matrix));
     cudaMallocManaged((void**)&C, sizeof(Matrix));
@@ -442,7 +441,7 @@ void CUDA_main()
     cudaMallocManaged((void**)&B->elements, nBytes);
     cudaMallocManaged((void**)&C->elements, nBytes);
 
-    // ³õÊ¼»¯Êı¾İ
+    // åˆå§‹åŒ–æ•°æ®
     A->height = height;
     A->width = width;
     B->height = height;
@@ -455,21 +454,21 @@ void CUDA_main()
         B->elements[i] = 2.0;
     }
 
-    // ¶¨ÒåkernelµÄÖ´ĞĞÅäÖÃ
+    // å®šä¹‰kernelçš„æ‰§è¡Œé…ç½®
     dim3 blockSize(32, 32);//32*32
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x,
         (height + blockSize.y - 1) / blockSize.y);//(1024+31)/32=32.97
-    // Ö´ĞĞkernel//ºöÂÔ´íÎóÌáÊ¾
+    // æ‰§è¡Œkernel//å¿½ç•¥é”™è¯¯æç¤º
     matMulKernel << < gridSize, blockSize >> > (A, B, C);
 
 
-    // Í¬²½device ±£Ö¤½á¹ûÄÜÕıÈ··ÃÎÊ
+    // åŒæ­¥device ä¿è¯ç»“æœèƒ½æ­£ç¡®è®¿é—®
     cudaDeviceSynchronize();
-    // ¼ì²éÖ´ĞĞ½á¹û
+    // æ£€æŸ¥æ‰§è¡Œç»“æœ
     float maxError = 0.0;
     for (int i = 0; i < width * height; ++i)
         maxError = fmax(maxError, fabs(C->elements[i] - 2 * width));
-    std::cout << "×î´óÎó²î: " << maxError << std::endl;
+    std::cout << "æœ€å¤§è¯¯å·®: " << maxError << std::endl;
     return;
 }
 

@@ -24,11 +24,11 @@ int main(int argc, char* argv[])
     //end = clock();
     //cout << "time = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;   
 
-    std::cout << "CPU计算:\n";
-    start = clock();
-    CPUmain(argv);
-    end = clock();
-    cout << "CPU计算time = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;    
+    //std::cout << "CPU计算:\n";
+    //start = clock();
+    //CPUmain(argv);
+    //end = clock();
+    //cout << "CPU计算time = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;    
 
     return 0;
 
