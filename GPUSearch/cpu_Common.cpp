@@ -22,7 +22,11 @@ void Vars::ShowPara()
     std::cout << "Embedding Dimention£º" << Dim << std::endl;
     std::cout << "Query Nums£º" << QNums << std::endl;
     std::cout << "Similarity£º" << (SimilarityF)SimF << std::endl;
-    std::cout << "Search Type£º" << SearchF << std::endl;
+    const char* SearchFstr = (SearchF == 0) ? "TopKSearch" : "RangeSearch";
+    std::cout << "Search Type£º" << SearchFstr << std::endl;
+    const char* SearchKRstr = (SearchF == 0) ? "K:" : "Range:";
+    std::cout << SearchKRstr << ((SearchF == 0) ? k : range) << std::endl;
+    
 }
 
 void Vars::ReadEmbData()

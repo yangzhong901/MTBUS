@@ -181,6 +181,16 @@ void getCudaInformaton()
 	std::cout << "每个线程块的最大线程数：" << devProp.maxThreadsPerBlock << std::endl;
 	std::cout << "每个SM的最大线程数：" << devProp.maxThreadsPerMultiProcessor << std::endl;
 	std::cout << "每个SM的最大线程束数：" << devProp.maxThreadsPerMultiProcessor / 32 << std::endl;
+
+    int dev1 = 1;
+    cudaDeviceProp devProp1;
+    CHECK(cudaGetDeviceProperties(&devProp1, dev1));
+    std::cout << "使用GPU device " << dev1 << ": " << devProp1.name << std::endl;
+    std::cout << "SM的数量：" << devProp1.multiProcessorCount << std::endl;
+    std::cout << "每个线程块的共享内存大小：" << devProp1.sharedMemPerBlock / 1024.0 << " KB" << std::endl;
+    std::cout << "每个线程块的最大线程数：" << devProp1.maxThreadsPerBlock << std::endl;
+    std::cout << "每个SM的最大线程数：" << devProp1.maxThreadsPerMultiProcessor << std::endl;
+    std::cout << "每个SM的最大线程束数：" << devProp1.maxThreadsPerMultiProcessor / 32 << std::endl;
 }
 
 void CUDASingleQuery(char* argv[])
