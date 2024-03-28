@@ -1,4 +1,4 @@
-#include "cpu_Header.h"
+﻿#include "cpu_Header.h"
 
 using namespace std;
 
@@ -18,15 +18,15 @@ void Vars::ReadPara(char* argv[])
 
 void Vars::ShowPara()
 {
-    std::cout << "Record Nums��" << RNums << std::endl;
-    std::cout << "Embedding Dimention��" << Dim << std::endl;
-    std::cout << "Query Nums��" << QNums << std::endl;
-    std::cout << "Similarity��" << (SimilarityF)SimF << std::endl;
-    const char* SearchFstr = (SearchF == 0) ? "TopKSearch" : "RangeSearch";
-    std::cout << "Search Type��" << SearchFstr << std::endl;
-    const char* SearchKRstr = (SearchF == 0) ? "K:" : "Range:";
-    std::cout << SearchKRstr << ((SearchF == 0) ? k : range) << std::endl;
+    std::cout << "Record Nums: " << RNums << std::endl;
+    std::cout << "Embedding Dimention: " << Dim << std::endl;
+    std::cout << "Query Nums: " << QNums << std::endl;
+    std::cout << "Similarity: " << (SimilarityF)SimF << std::endl;
     
+    const char* SearchFstr = (SearchF == 0) ? "TopKSearch" : "RangeSearch";
+    std::cout << "Search Type: " << SearchFstr << std::endl;
+    const char* SearchKRstr = (SearchF == 0) ? "K: " : "Range: ";
+    std::cout << SearchKRstr << ((SearchF == 0) ? k : range) << std::endl;
 }
 
 void Vars::ReadEmbData()
@@ -77,7 +77,7 @@ void Vars::ReadOrgTextData()
     if (infile.is_open())
     {
         getline(infile, line);
-        infile.clear();//���Ե�һ��
+        infile.clear();//忽略第一行
         while (getline(infile, line))
         {            
             stringstream ss(line);
@@ -224,7 +224,7 @@ void MatMul()
     int height = 1024;
     int width = 1024;
 
-    //��ʼ��
+    //初始化
     int** A = new int* [width];//A[a][b]
     int** B = new int* [width];//B[b][a]
     int** C = new int* [width];//C[m][n]=C[a][a]
@@ -236,7 +236,7 @@ void MatMul()
         C[i] = new int[height];
     }
 
-    //��ֵ
+    //赋值
     for (int i = 0; i < width; i++)
     {
         for (int j = 0; j < height; j++)
@@ -245,7 +245,7 @@ void MatMul()
             B[i][j] = 2;
         }
     }
-    //�������
+    //矩阵相乘
     for (int m = 0; m < height; m++) {
         for (int n = 0; n < height; n++)
         {
@@ -273,10 +273,10 @@ void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candDa
             boxInersection = -1.0;
             return;
         }
-        //log regularization�����������=���ȡ�����������
+        //log regularization，对数的相乘=相加取对数，先相加
         boxInersection += tmp;           
     }
-    //log regularization��ȡ����
+    //log regularization，取对数
     boxInersection = (float)abs(log10(boxInersection));
     candData cd;
     cd.rID = j;
@@ -316,7 +316,7 @@ void Vars::SearchCandidates(int qID)
     }
     //for (size_t c = 0; c < candidateSet.cans.size(); c++)
     //{
-    //    std::cout << "ID��" << candidateSet.cans[c].rID << ";" << candidateSet.cans[c].boxIntersection << std::endl;
+    //    std::cout << "ID：" << candidateSet.cans[c].rID << ";" << candidateSet.cans[c].boxIntersection << std::endl;
     //}
     //Save qi's candidates
     candidateSets.push_back(candidateSet);
@@ -327,7 +327,7 @@ void Vars::VerifyAllCandidates(int id,int qID)
 {   
     resultDatas resultSet;
     resultSet.qID = qID;
-    //��ѡ����embed�ཻ�Ĵ�С����
+    //候选按照embed相交的大小排序
     sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
     for (size_t i = 0; i < candidateSets[id].cans.size(); i++)
     {
@@ -345,14 +345,14 @@ void Vars::topkSearch(int id, int qID)
     resultDatas resultSet;
     resultSet.qID = qID;
    
-    //��ѡ����embed�ཻ�Ĵ�С����
-    //��С������,log����֮��ֵԽСԽ����
+    //候选按照embed相交的大小排序
+    //从小到大排,log正则化之后，值越小越相似
     sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
-    //�Ӵ�С��
+    //从大到小排
     //sort(candidateSet.cans.begin(), candidateSet.cans.end(),greater<float>());
 
-    //��embedding�ཻ��ֵ�ɿ���candidate��˳��������ƶȵ�˳��
-    //��embeddingһ����������һ������ϵ��������ǰlambda*k��cans
+    //若embedding相交的值可靠，candidate的顺序就是相似度的顺序
+    //但embedding一定有误差，加入一个估计系数，计算前lambda*k个cans
     for (size_t i = 0; i < ceil(lambdaK*k); i++)
     {
         resultData result;
@@ -385,14 +385,14 @@ void Vars::rangeSearch(int id, int qID)
     resultSet.qID = qID;
     //Search Candidates for qi
     
-    //��ѡ����embed�ཻ�Ĵ�С����
-    //��С������,log����֮��ֵԽСԽ����
+    //候选按照embed相交的大小排序
+    //从小到大排,log正则化之后，值越小越相似
     sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
-    //�Ӵ�С��
+    //从大到小排
     //sort(candidateSet.cans.begin(), candidateSet.cans.end(),greater<float>());
 
-    //��embedding�ཻ��ֵ�ɿ���candidate��˳��������ƶȵ�˳��
-    //��embeddingһ����������һ������ϵ�����ҵ�С��range�Ĳ������ټ�������lambda*i��cans
+    //若embedding相交的值可靠，candidate的顺序就是相似度的顺序
+    //但embedding一定有误差，加入一个估计系数，找到小于range的参数后，再继续计算lambda*i个cans
     int sizeR = (int)embeddings.size();
     for (size_t i = 0; i < sizeR; i++)
     {
@@ -402,7 +402,7 @@ void Vars::rangeSearch(int id, int qID)
                
         if (result.similarity >= range)
             resultSet.res.push_back(result);
-        else//�ټ�������lambda*i��cans
+        else//再继续计算lambda*i个cans
             sizeR = (int)ceil(lambdaRange * i);
 
     }
@@ -418,7 +418,7 @@ void CPUmain(char* argv[])
     vars.ReadEmbData();
     vars.ShowPara();
 
-    //ȡQNums�������¼��Ϊ��ѯQ
+    //取QNums个随机记录作为查询Q
     srand((unsigned)2024);
     vector<int> qIDs;
     for (size_t n = 0; n < vars.QNums; n++)
