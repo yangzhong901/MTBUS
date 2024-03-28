@@ -3,7 +3,7 @@
 using namespace std;
 
 void Vars::ReadPara(char* argv[])
-{    
+{   
     filePathEmb = argv[1];
     filePathTxt = argv[2];
     QNums = atoi(argv[3]);
@@ -13,7 +13,7 @@ void Vars::ReadPara(char* argv[])
     if (SearchF==0)
         k= atoi(argv[7]);
     else if (SearchF == 1)
-        range = atof(argv[7]);
+        range = (float)atof(argv[7]);
 }
 
 void Vars::ShowPara()
@@ -267,17 +267,15 @@ void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candDa
     float boxInersection = 1.0;
     for (size_t i = 0; i < step; i++)
     {
-        double tmp = min(q[i+step],emb[i + step]) - max(q[i], emb[i]);
+        float tmp = min(q[i+step],emb[i + step]) - max(q[i], emb[i]);
         if(tmp<=0)
         {
             boxInersection = -1.0;
             return;
         }
-        //log regularization，对数的相乘=相加取对数，先相加
-        boxInersection += tmp;           
-    }
-    //log regularization，取对数
-    boxInersection = (float)abs(log10(boxInersection));
+        //log regularization
+        boxInersection *= (float)abs(log10(tmp));
+    }    
     candData cd;
     cd.rID = j;
     cd.boxIntersection = boxInersection;
@@ -322,13 +320,12 @@ void Vars::SearchCandidates(int qID)
     candidateSets.push_back(candidateSet);
 }
 
-//Search and Verify All Candidates for qi
+//Verify All Candidates for each qi
 void Vars::VerifyAllCandidates(int id,int qID)
-{   
+{
     resultDatas resultSet;
     resultSet.qID = qID;
-    //候选按照embed相交的大小排序
-    sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
+        
     for (size_t i = 0; i < candidateSets[id].cans.size(); i++)
     {
         resultData result;
@@ -337,23 +334,21 @@ void Vars::VerifyAllCandidates(int id,int qID)
         resultSet.res.push_back(result);
     }    
     //Save qi's results
-    resultSets.push_back(resultSet);
+    resultSets3.push_back(resultSet);
 }
 
 void Vars::topkSearch(int id, int qID)
 {    
     resultDatas resultSet;
     resultSet.qID = qID;
-   
-    //候选按照embed相交的大小排序
-    //从小到大排,log正则化之后，值越小越相似
-    sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
-    //从大到小排
-    //sort(candidateSet.cans.begin(), candidateSet.cans.end(),greater<float>());
 
     //若embedding相交的值可靠，candidate的顺序就是相似度的顺序
     //但embedding一定有误差，加入一个估计系数，计算前lambda*k个cans
-    for (size_t i = 0; i < ceil(lambdaK*k); i++)
+    size_t sizeC = (size_t)candidateSets[id].cans.size();
+    size_t sizeK = (size_t)ceil(k * lambdaK);
+    if (sizeC > sizeK)
+        sizeC = sizeK;
+    for (size_t i = 0; i < sizeC; i++)
     {
         resultData result;
         int rID = result.rID = candidateSets[id].cans[i].rID;
@@ -364,13 +359,13 @@ void Vars::topkSearch(int id, int qID)
         else
         {
             sort(resultSet.res.begin(), resultSet.res.end(), resLarger);
-            if (result.similarity > resultSet.res[k].similarity)
+            if (result.similarity > resultSet.res[k-1].similarity)
             {
-                resultSet.res[k].rID = result.rID;
-                resultSet.res[k].similarity = result.similarity;
+                resultSet.res[k-1].rID = result.rID;
+                resultSet.res[k-1].similarity = result.similarity;
             }
             else
-                continue;
+                continue;        
         }
     }
     sort(resultSet.res.begin(), resultSet.res.end(), resLarger);
@@ -382,19 +377,13 @@ void Vars::topkSearch(int id, int qID)
 void Vars::rangeSearch(int id, int qID)
 {   
     resultDatas resultSet;
-    resultSet.qID = qID;
-    //Search Candidates for qi
-    
-    //候选按照embed相交的大小排序
-    //从小到大排,log正则化之后，值越小越相似
-    sort(candidateSets[id].cans.begin(), candidateSets[id].cans.end(), canLesser);
-    //从大到小排
-    //sort(candidateSet.cans.begin(), candidateSet.cans.end(),greater<float>());
+    resultSet.qID = qID;    
 
     //若embedding相交的值可靠，candidate的顺序就是相似度的顺序
     //但embedding一定有误差，加入一个估计系数，找到小于range的参数后，再继续计算lambda*i个cans
-    int sizeR = (int)embeddings.size();
-    for (size_t i = 0; i < sizeR; i++)
+    size_t sizeC = (int)candidateSets[id].cans.size();
+     
+    for (size_t i = 0; i < sizeC; i++)
     {
         resultData result;
         int rID = result.rID = candidateSets[id].cans[i].rID;
@@ -403,7 +392,11 @@ void Vars::rangeSearch(int id, int qID)
         if (result.similarity >= range)
             resultSet.res.push_back(result);
         else//再继续计算lambda*i个cans
-            sizeR = (int)ceil(lambdaRange * i);
+        {
+            size_t sizeR = (size_t)ceil(lambdaRange * i);
+            if (sizeC > sizeR)
+                sizeC = sizeR;
+        }
 
     }
     //Save qi's results
@@ -418,6 +411,8 @@ void CPUmain(char* argv[])
     vars.ReadEmbData();
     vars.ShowPara();
 
+    clock_t start, end;
+    start = clock();
     //取QNums个随机记录作为查询Q
     srand((unsigned)2024);
     vector<int> qIDs;
@@ -428,17 +423,44 @@ void CPUmain(char* argv[])
         //cout << "QID = " << qid << endl;
     }
     
+    //Search Candidates and Sort
     for (size_t i = 0; i < qIDs.size(); i++)
     {
-        vars.SearchCandidates(qIDs[i]);
+        vars.SearchCandidates(qIDs[i]);        
+        //候选按照embed相交的大小排序
+        //从小到大排,log正则化之后，值越小越相似
+        sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(), canLesser);
+        //从大到小排
+        //sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(),canLarger);
+    }
+    end = clock();
+    cout << "CPUtime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
+
+    vars.lambdaK = 1.0f;
+    vars.lambdaRange = 1.0f;
+    //Verify Results
+    for (size_t i = 0; i < qIDs.size(); i++)
+    {        
         if (vars.SearchF == 0)
-            vars.VerifyAllCandidates((int)i,qIDs[i]);
-        if (vars.SearchF == 1)
             vars.topkSearch((int)i,qIDs[i]);
-        if (vars.SearchF == 2)
+        if (vars.SearchF == 1)
             vars.rangeSearch((int)i,qIDs[i]);
     }
 
-    vars.SaveResults();
+    //Evaluation
+    for (size_t i = 0; i < qIDs.size(); i++)
+    {
+        vars.VerifyAllCandidates((int)i, qIDs[i]);
+        if (vars.SearchF == 0)
+        {
+
+        }
+        if (vars.SearchF == 1)
+        {
+
+        }
+    }
+
+    //vars.SaveResults();
     return;
 }
