@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #ifndef CPU_HEADER_H
 #define CPU_HEADER_H
@@ -58,10 +58,10 @@ class Vars
 public:
 		
 	int SimF = 0;//0,Overlap; 1,Jaccard; 2,Cosine; 3,Dice;
-	int SearchF = 0;//0,topkSearch; 1,rangeSearch;
+	int SearchF = 0;//0,topkSearch; 1,rangeSearch; 3, evaluation
 	int k = 10;
 	float range = 0.9f;
-	float lambdaK = 2.0f;
+	float lambdaK = 1.1f;
 	float lambdaRange = 1.1f;
 
 	int RNums = -1;
@@ -76,10 +76,16 @@ public:
 
 	vector<vector<float>> embeddings;
 	vector<orgData> orgText;
-	//vector<candData> candidates;
+	//candidates of all qis;
 	vector<candDatas> candidateSets;
-	//vector<resultData> results;
+	//results of all qis;
 	vector<resultDatas> resultSets;
+
+	//candidates for evaluation;
+	vector<candDatas> candidateSets3;
+	//results for evaluation
+	vector<resultDatas> resultSets3;
+
 public:void ReadPara(char* argv[]);
 public:void ShowPara();
 public:void ReadEmbData();
@@ -87,9 +93,12 @@ public:void ReadOrgTextData();
 public:float Similarity(int simFun, vector<int> q, vector<int> r);
 public:void SearchCandidates(int qID);
 public:void VerifyAllCandidates(int id, int qID);
+public:void VerifyAllCandidatesForTopK(int id, int qID);
+public:void	VerifyAllCandidatesForRange(int id, int qID);
 public:void topkSearch(int id, int qID);
 public:void rangeSearch(int id, int qID);
 public:void SaveResults();
+public:float ComputeAccuracy(resultDatas& r, resultDatas& r3);
 };
 
 void MatMul();

@@ -259,8 +259,6 @@ void MatMul()
     }
 }
 
-
-
 void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candData>& cans)
 {
     int step =(int) emb.size() / 2;
@@ -337,6 +335,54 @@ void Vars::VerifyAllCandidates(int id,int qID)
     resultSets3.push_back(resultSet);
 }
 
+//Verify All Candidates for each qi of topk search
+void Vars::VerifyAllCandidatesForTopK(int id, int qID)
+{
+    resultDatas resultSet;
+    resultSet.qID = qID;
+
+    for (size_t i = 0; i < candidateSets[id].cans.size(); i++)
+    {
+        resultData result;
+        int rID = result.rID = candidateSets[id].cans[i].rID;
+        result.similarity = Similarity(SimF, orgText[qID].record, orgText[rID].record);
+        
+        if (resultSet.res.size() < k)
+            resultSet.res.push_back(result);
+        else
+        {
+            sort(resultSet.res.begin(), resultSet.res.end(), resLarger);
+            if (result.similarity > resultSet.res[k - 1].similarity)
+            {
+                resultSet.res[k - 1].rID = result.rID;
+                resultSet.res[k - 1].similarity = result.similarity;
+            }
+            else
+                continue;
+        }
+    }
+    //Save qi's results
+    resultSets3.push_back(resultSet);
+}
+
+//Verify All Candidates for each qi of range search
+void Vars::VerifyAllCandidatesForRange(int id, int qID)
+{
+    resultDatas resultSet;
+    resultSet.qID = qID;
+
+    for (size_t i = 0; i < candidateSets[id].cans.size(); i++)
+    {
+        resultData result;
+        int rID = result.rID = candidateSets[id].cans[i].rID;
+        result.similarity = Similarity(SimF, orgText[qID].record, orgText[rID].record);
+        if (result.similarity >= range)
+            resultSet.res.push_back(result); 
+    }
+    //Save qi's results
+    resultSets3.push_back(resultSet);
+}
+
 void Vars::topkSearch(int id, int qID)
 {    
     resultDatas resultSet;
@@ -403,6 +449,33 @@ void Vars::rangeSearch(int id, int qID)
     resultSets.push_back(resultSet);
 }
 
+float Vars::ComputeAccuracy(resultDatas& r, resultDatas& r3)
+{
+    vector<int> r3IDs;
+    vector<int> rIDs;
+    for (size_t i = 0; i < r3.res.size(); i++)
+    {
+        r3IDs.push_back(r3.res[i].rID);
+    }
+    for (size_t i = 0; i < r.res.size(); i++)
+    {
+        rIDs.push_back(r.res[i].rID);
+    }
+    sort(r3IDs.begin(), r3IDs.end());
+    sort(rIDs.begin(), rIDs.end());
+
+    int i = 0, j = 0, ans = 0;
+    while (i < r3IDs.size() && j < rIDs.size()) {
+        if (r3IDs[i] == rIDs[j]) ++i, ++j, ++ans;
+        else {
+            if (r3IDs[i] < rIDs[j]) ++i;
+            else ++j;
+        }
+    }
+    return ans*1.0f/ r3.res.size();
+}
+
+
 void CPUmain(char* argv[])
 {
     Vars vars;
@@ -450,15 +523,15 @@ void CPUmain(char* argv[])
     //Evaluation
     for (size_t i = 0; i < qIDs.size(); i++)
     {
-        vars.VerifyAllCandidates((int)i, qIDs[i]);
+        //vars.VerifyAllCandidates((int)i, qIDs[i]);
         if (vars.SearchF == 0)
-        {
-
-        }
+            vars.VerifyAllCandidatesForTopK((int)i, qIDs[i]);
         if (vars.SearchF == 1)
-        {
-
-        }
+            vars.VerifyAllCandidatesForRange((int)i, qIDs[i]);
+        
+        //resultSet Comparison
+        float acc = vars.ComputeAccuracy(vars.resultSets[i], vars.resultSets3[i]);
+        cout << "q" << to_string(i) << " Accuracy:" << to_string(acc) <<endl;
     }
 
     //vars.SaveResults();
