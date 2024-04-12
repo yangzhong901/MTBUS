@@ -58,6 +58,7 @@ void Vars::ReadEmbData()
         }        
     }
     Dim = (int)embeddings[0].size();
+    step = (int)(Dim / 2);
     cout<< "# Embeddings Records: " << lineNum << endl;
 }
 
@@ -259,24 +260,23 @@ void MatMul()
     }
 }
 
-void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candData>& cans)
+void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candData>& cans, float qExpValue)
 {
     int step =(int) emb.size() / 2;
     float boxInersection = 1.0;
     for (size_t i = 0; i < step; i++)
     {
-        float tmp = min(q[i+step],emb[i + step]) - max(q[i], emb[i]);
-        if(tmp<=0)
+        float tmp = min(q[i + step], emb[i + step]) - max(q[i], emb[i]);
+        if (tmp <= 0)
         {
             boxInersection = -1.0;
             return;
         }
-        //log regularization
-        boxInersection *= (float)abs(log10(tmp));
-    }    
+        boxInersection += (float)log(tmp);
+    }
     candData cd;
     cd.rID = j;
-    cd.boxIntersection = boxInersection;
+    cd.boxIntersection = boxInersection/ qExpValue;//regularization归一化到[0,1]区间
     cans.push_back(cd);    
 }
 
@@ -304,11 +304,20 @@ void Vars::SearchCandidates(int qID)
 {
     candDatas candidateSet;
     candidateSet.qID = qID;
+
+    //Compute qbox log value
+    float qExpValue = 1.0f;
+    for (size_t i = 0; i < embeddings[qID].size(); i++)
+    {
+        float tmp = embeddings[qID][i + step] - embeddings[qID][i];
+        qExpValue += log(tmp);
+    }
+
     //Search Candidates for qi
     for (size_t j = 0; j < embeddings.size(); j++)
     {
         //if(j==1816)
-        ComBoxIntersection(embeddings[qID], embeddings[j], (int)j, candidateSet.cans);
+        ComBoxIntersection(embeddings[qID], embeddings[j], (int)j, candidateSet.cans, qExpValue);
     }
     //for (size_t c = 0; c < candidateSet.cans.size(); c++)
     //{
@@ -449,6 +458,24 @@ void Vars::rangeSearch(int id, int qID)
     resultSets.push_back(resultSet);
 }
 
+//Estimate Search
+void Vars::EstimateSearch(int id, int qID)
+{
+    EstimateLen = (int)(EstimateRate * Dim);
+    float estimateQBox = 1.0f;
+    int step = (int)(Dim / 2);
+    //Q的box值作为估计值的估计部分
+    for (size_t i = embeddings[qID].size(); i > embeddings[qID].size()- EstimateLen; i--)
+    {        
+        float tmp = embeddings[qID][i]- embeddings[qID][i-step];
+        estimateQBox *= (float)abs(log10(tmp));
+    }
+
+
+
+}
+
+
 float Vars::ComputeAccuracy(resultDatas& r, resultDatas& r3)
 {
     vector<int> r3IDs;
@@ -501,10 +528,10 @@ void CPUmain(char* argv[])
     {
         vars.SearchCandidates(qIDs[i]);        
         //候选按照embed相交的大小排序
-        //从小到大排,log正则化之后，值越小越相似
-        sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(), canLesser);
+        //从小到大排
+        //sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(), canLesser);
         //从大到小排
-        //sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(),canLarger);
+        sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(),canLarger);
     }
     end = clock();
     cout << "CPUtime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
@@ -521,6 +548,7 @@ void CPUmain(char* argv[])
     }
 
     //Evaluation
+    float tmpacc = 0;
     for (size_t i = 0; i < qIDs.size(); i++)
     {
         //vars.VerifyAllCandidates((int)i, qIDs[i]);
@@ -532,8 +560,11 @@ void CPUmain(char* argv[])
         //resultSet Comparison
         float acc = vars.ComputeAccuracy(vars.resultSets[i], vars.resultSets3[i]);
         cout << "q" << to_string(i) << " Accuracy:" << to_string(acc) <<endl;
+        vars.acccuacy.push_back(acc);
+        tmpacc += acc;
     }
-
+    vars.AverageAcy = tmpacc / vars.QNums;
+    cout << "Average Accuracy:" << to_string(vars.AverageAcy) << endl;
     //vars.SaveResults();
     return;
 }

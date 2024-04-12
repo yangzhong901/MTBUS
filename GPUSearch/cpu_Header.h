@@ -66,10 +66,12 @@ public:
 
 	int RNums = -1;
 	int Dim = -1;
+	int step = 1;
 	int EmbNums = -1;
 	int QNums = -1;
 	int Batch = 256;
-	int LenOfEstimate = 1;
+	float EstimateRate = 0.25f;
+	int EstimateLen = 1;
 
 	char* filePathTxt = (char*)malloc(32 * sizeof(char));
 	char* filePathEmb = (char*)malloc(32 * sizeof(char));
@@ -86,6 +88,11 @@ public:
 	//results for evaluation
 	vector<resultDatas> resultSets3;
 
+	//accuracy 
+	vector<float> acccuacy;
+	//average accuracy
+	float AverageAcy = 0.0f;;
+
 public:void ReadPara(char* argv[]);
 public:void ShowPara();
 public:void ReadEmbData();
@@ -99,6 +106,7 @@ public:void topkSearch(int id, int qID);
 public:void rangeSearch(int id, int qID);
 public:void SaveResults();
 public:float ComputeAccuracy(resultDatas& r, resultDatas& r3);
+public:void EstimateSearch(int id, int qID);
 };
 
 void MatMul();

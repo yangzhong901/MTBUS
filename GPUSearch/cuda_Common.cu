@@ -79,17 +79,21 @@ __global__ void ComputeKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int N)
             double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
                 - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
             //需要每个维度都大于0
-            if (tmp <= 0)//并行线程内的判断影响同步，尽量减少if分支
-            {
-                Cvalue = -1.0;
-                //break;
-            }
-            else
-            {    ////Cvalue *= tmp;//小数多次相乘会导致数值接近0，数值消失vanishing，需做正则化Normalization
-                // log正则化
-                Cvalue *= abs(log10(tmp));
-            }
+            //if (tmp <= 0)//并行线程内的判断影响同步，尽量减少if分支
+            //{
+            //    Cvalue = -1.0;
+            //    //break;
+            //}
+            //else
+            //{   
+            //Cvalue *= tmp;//小数多次相乘会导致数值接近0，由于精度原因数值消失vanishing，需做正则化Normalization
+            //log(x)+log(y)=log(xy);log相加等于相乘的log，使得相乘计算的值得以保留；
+            //但是log函数在[0,1]上的值域是负的，导致乘积结果不单调，若能保证tmp值小于1，则可保证Cvalue绝对值为单调的
+            Cvalue += log(tmp);
+            Cvalue = abs(Cvalue);
+            //}
         }
+        
         //Cvalues的z正则化Z-Normalization
         //均值
         //double mean = 0;
@@ -130,7 +134,7 @@ __global__ void ComputeKernel2(Matrix* R, Matrix* Q, Matrix* C, int dim)
         //需要每个维度都大于0,
         //Cvalue *= tmp;//小数多次相乘会导致数值接近0，数值消失vanishing，需做正则化Normalization
         // log正则化,且log之后，tmp小于零会得到nan
-        Cvalue *= abs(log10(tmp));
+        Cvalue += log(tmp);
 
     }
     setElement(C, rowC, colC, Cvalue);
@@ -151,20 +155,7 @@ __global__ void SingleQueryKernel(Matrix* R, float* Q, float* C, int dim)
             - max(R->elements[rowA * R->width + d], Q[d]);                          //前半元素
 
         //需要每个维度都大于0
-        Cvalue *= abs(log10(tmp));
-        //if (tmp < 0)//并行线程内的判断影响同步，尽量减少if分支
-        //{
-        //    Cvalue = -1.0f;
-        //    //break;
-        //}
-        //else if (tmp==0)
-        //{
-        //    Cvalue = 0;
-        //}
-        //else
-        //{   //log正则化
-        //    Cvalue *= abs(log10(tmp));
-        //}
+        Cvalue *= exp(tmp);
     }
     C[colC]=Cvalue;
 }
@@ -269,6 +260,9 @@ void CUDACompute(char* argv[])
     vars.ReadEmbData();
     vars.ShowPara();
     
+    clock_t start, end, start0;
+    start0 = clock();
+    start = clock();
     //以输出矩阵的高、宽为基准
     int height = vars.QNums;    //输出的高为查询的数量|q|=Qnums，单查询则为1，多个查询则为n
     int width = vars.EmbNums;   //输出的宽为记录的数量N，QNums若大于总线程数，则跳步循环
@@ -309,8 +303,9 @@ void CUDACompute(char* argv[])
     cudaMallocManaged((void**)&R->elements, R_Bytes);
     cudaMallocManaged((void**)&Q->elements, Q_Bytes);
     cudaMallocManaged((void**)&C->elements, C_Bytes);
+    end = clock();
+    cout << "GPUMemorytime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
 
-    clock_t start, end;
     start = clock();
     //数据加载，R，Q分开加载，Q在R加载的过程中加载会变慢！
     //数据R加载,数据加载必须在申请内存托管之后，否则无法加载到GPU
@@ -337,6 +332,7 @@ void CUDACompute(char* argv[])
     end = clock();
     cout << "LoadDataToGPUtime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
 
+    start = clock();
     //SM的数量：10
     //每个线程块的共享内存大小：48 KB
     //每个线程块的最大线程数：1024
@@ -353,10 +349,13 @@ void CUDACompute(char* argv[])
 
     //执行kernel//忽略错误提示
     ComputeKernel << < gridSize, blockSize >> > (R, Q, C, dim, width);
-    //ComputeKernel2 << < gridSize, blockSize >> > (R, Q, C, dim);
+    
     // 同步device 保证结果能正确访问
     cudaDeviceSynchronize();
     
+    end = clock();
+    cout << "GPUComputetime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
+    cout << "GPUtime = " << double(end - start0) / CLOCKS_PER_SEC << "s" << endl;
     //for (size_t i = 0; i < C->width; i++)
     //{
     //    //C(row, col) = *(C.elements + row * C.width + col)
@@ -387,11 +386,11 @@ void CUDACompute(char* argv[])
 
     for (size_t i = 0; i < queries.size(); i++)
     {        
-        if (vars.SearchF == 0)
+        if (vars.SearchF == 3)
             vars.VerifyAllCandidates((int)i,queries[i]);
-        if (vars.SearchF == 1)
+        if (vars.SearchF == 0)
             vars.topkSearch((int)i,queries[i]);
-        if (vars.SearchF == 2)
+        if (vars.SearchF == 1)
             vars.rangeSearch((int)i,queries[i]);
     }
  
