@@ -43,7 +43,7 @@ class Enumeration():
         e_j = self.V2E[v][pyfastrand.pcg32bounded(len(self.V2E[v]))]        
         return e_j
     
-    def enumerate_instances(self, pos_size, neg_size, rand_seed=2022):
+    def enumerate_instances(self, pos_size, neg_size, rand_seed=2024):
         np.random.seed(rand_seed)
         
         instances, overlaps = [], []
@@ -72,3 +72,42 @@ class Enumeration():
         overlaps = torch.tensor(overlaps).float()
             
         return instances, overlaps
+
+    def get_instance_info_multi(self, e_i, e_j):
+        l_i = len(self.E2V[e_i])
+        l_j = len(self.E2V[e_j])
+        l_ij = len(self.E2V_set[e_i].intersection(self.E2V_set[e_j]))
+        overlap = l_ij  # overlap = l_ij/max(l_i, l_j)
+        jaccard = l_ij/(l_i + l_j - l_ij)
+        cosine = l_ij/l_i*l_j
+        dice = 2*l_ij/(l_i + l_j)
+        instance = [e_i, e_j]
+
+        sims = [overlap, jaccard, cosine, dice]
+        return instance, sims
+
+    def enumerate_instances_multisim(self, pos_size, neg_size, rand_seed=2024):
+        np.random.seed(rand_seed)
+
+        instances, similarities = [], []
+
+        for e_i in trange(len(self.E2V), position=0, leave=False):
+            size_i = len(self.E2V[e_i])
+
+            for _ in range(pos_size):
+                e_j = self.sample_neighbor(e_i)
+
+                instance, sims = self.get_instance_info(e_i, e_j)
+                instances.append(instance)
+                similarities.append(sims)
+
+            for _ in range(neg_size):
+                e_j = pyfastrand.pcg32bounded(len(self.E2V))
+                instance, sims = self.get_instance_info(e_i, e_j)
+                instances.append(instance)
+                similarities.append(sims)
+
+        instances = torch.tensor(instances)
+        similarities = torch.tensor(similarities).float()
+
+        return instances, similarities

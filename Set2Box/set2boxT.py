@@ -66,29 +66,38 @@ class model(nn.Module):
         c_i, c_j = emb_center[:, 0, :], emb_center[:, 1, :]
         r_i, r_j = emb_radius[:, 0, :], emb_radius[:, 1, :]
 
-        #2 Box instances: Box_i, Box_j
-        m_i, m_j = c_i - r_i, c_j - r_j
-        M_i, M_j = c_i + r_i, c_j + r_j
+        # 2 Box instances: Box_i, Box_j
+        # m_i, m_j = c_i - r_i, c_j - r_j
+        # M_i, M_j = c_i + r_i, c_j + r_j
 
-        # Box Edge length
-        Box_Edge_i = f.softplus(M_i - m_i, self.beta)
-        Box_Edge_j = f.softplus(M_j - m_j, self.beta)
-        Box_Edge_delta = f.softplus(torch.min(M_i, M_j) - torch.max(m_i, m_j), self.beta)
-        #Box Volum
-        Box_Volum_i = torch.sum(torch.log(Box_Edge_i + EPS),1)
-        Box_Volum_j = torch.sum(torch.log(Box_Edge_j + EPS),1)
-        #Intersection
-        Box_Inter = torch.sum(torch.log(Box_Edge_delta+ EPS),1)
-        #Costs
-        C_Overlap = Box_Inter
-        C_Jaccard = Box_Inter/(Box_Volum_i + Box_Volum_j - Box_Inter)
-        C_Cosine = Box_Inter/torch.pow(torch.sum(torch.log(torch.stack((Box_Volum_i,Box_Volum_j),1),EPS),1),self.dim)
-        C_Dice = 2*Box_Inter/(Box_Volum_i + Box_Volum_j)
+        # 2 boxes: box_i, box_j;
+        # Box Edge length: M_i > m_i, M_j > m_j
+        m_i = f.softplus(c_i, self.beta)
+        box_edge_i = f.softplus(r_i, self.beta)
+        M_i = m_i + box_edge_i
 
-        lose_1 = torch.exp(C_Overlap)
-        lose_2 = torch.exp(C_Jaccard)
-        lose_3 = torch.exp(C_Cosine)
-        lose_4= torch.exp(C_Dice)
+        m_j = f.softplus(c_j, self.beta)
+        box_edge_j = f.softplus(r_j, self.beta)
+        M_j = m_j + box_edge_j
+
+        box_edge_delta = torch.min(M_i, M_j) - torch.max(m_i, m_j)
+
+        # Box Volume
+        box_volume_i = torch.sum(torch.log(box_edge_i + EPS), 1)
+        box_volume_j = torch.sum(torch.log(box_edge_j + EPS), 1)
+        # Intersection and Union
+        box_inter = torch.sum(torch.log(box_edge_delta + EPS), 1)
+        box_union = torch.sum(torch.log(torch.max(M_i, M_j) - torch.min(m_i, m_j) + EPS), 1)
+        # Costs
+        c_overlap = box_inter  # c_overlap= box_inter/torch.max(box_volume_i, box_volume_j)
+        c_jaccard = box_inter/box_union
+        c_cosine = box_inter/torch.pow(torch.sum(torch.log(torch.stack((box_volume_i, box_volume_j), 1), EPS), 1), 1/self.dim)
+        c_dice = 2*box_inter/(box_volume_i + box_volume_j)
+
+        lose_1 = torch.exp(c_overlap)
+        lose_2 = torch.exp(c_jaccard)
+        lose_3 = torch.exp(c_cosine)
+        lose_4 = torch.exp(c_dice)
 
         lose_1 = self.loss(lose_1, overlaps[0])
         lose_2 = self.loss(lose_2, overlaps[1])

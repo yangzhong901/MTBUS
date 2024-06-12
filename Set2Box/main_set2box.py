@@ -120,8 +120,8 @@ for epoch in range(1, args.epochs + 1):
     # Evaluate the Model ##########
     for dType in ['train', 'valid', 'test']:
         eva_time = time.time()
-        pred = evaluation.pairwise_similarity(model, S[dType], M[dType], args.beta, dType, True)
-        for metric in ['ji', 'di', 'oc', 'cs']:
+        pred = evaluation.pairwise_similarity(model, S[dType], M[dType], args.beta, dType, args.dim, True)
+        for metric in ['oc', 'ji', 'cs', 'di']:
             mse = mean_squared_error(pred[metric], evaluation.ans[dType][metric])
             print('{}_{} (MSE):\t'.format(dType, metric) + str(mse))
         print('evaluation time:\t\t{} seconds'.format(time.time()-eva_time), '\n')
