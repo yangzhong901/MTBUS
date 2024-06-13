@@ -18,7 +18,7 @@ import torch.optim as optim
 import utils
 import enumeration
 import evaluation
-import set2boxp
+import set2boxm
 
 EPS = 1e-10
 
@@ -60,7 +60,7 @@ print('Reading data done:\t\t{} seconds'.format(time.time() - runtime), '\n')
 start_time = time.time()
 
 enumeration = enumeration.Enumeration(sets['train'])
-instances, similarities = enumeration.enumerate_instances(args.pos_instance, args.neg_instance)
+instances, similarities = enumeration.enumerate_instances_multi(args.pos_instance, args.neg_instance)
 
 instances, similarities = instances, similarities
 
@@ -77,7 +77,7 @@ print('Preparing evaluation done:\t', time.time() - start_time, '\n')
 ########## Prepare Training ##########
 start_time = time.time()
 
-model = set2boxp.model(num_items, args.dim, args.beta, args.K, args.D, args.tau).to(device)
+model = set2boxm.model(num_items, args.dim, args.beta, args.K, args.D, args.tau).to(device)
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
 print('Preparing training done:\t', time.time() - start_time, '\n')
@@ -108,7 +108,8 @@ for epoch in range(1, args.epochs + 1):
             loss_agg = model.forward(S['train'], M['train'], batch_instances, similarities[batches[i]], False)
             epoch_loss += loss_agg.item()
         else:
-            loss_1, loss_2, loss_3, loss_4 = model.forward(S['train'], M['train'], batch_instances, similarities[batches[i]], True)
+            loss_1, loss_2, loss_3, loss_4 = \
+                model.forward(S['train'], M['train'], batch_instances, similarities[batches[i]], True)
             epoch_losses[1] += loss_1.item()
             epoch_losses[2] += loss_2.item()
             epoch_losses[3] += loss_3.item()
@@ -128,13 +129,13 @@ for epoch in range(1, args.epochs + 1):
     if args.lmbda == 0:
         print('Loss:\t', epoch_loss)
     else:
-        for i in range(1, 8+1):
+        for i in range(1, 4+1):
             print('Loss {}:\t'.format(i), epoch_losses[i])
     train_time = time.time() - train_time
     
     ########## Evaluate the Model ##########
     for dtype in ['train', 'valid', 'test']:
-        pred = evaluation.pairwise_similarity(model, S[dtype], M[dtype], args.beta, dtype, args.dim, False)
+        pred = evaluation.pairwise_similarity_multitask(model, S[dtype], M[dtype], args.beta, dtype, args.dim, False)
         for metric in ['oc', 'ji', 'cs', 'di']:
             mse = mean_squared_error(pred[metric], evaluation.ans[dtype][metric])
             print('{}_{} (MSE):\t'.format(dtype, metric) + str(mse))
