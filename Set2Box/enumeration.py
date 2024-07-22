@@ -77,19 +77,22 @@ class Enumeration():
         l_i = len(self.E2V[e_i])
         l_j = len(self.E2V[e_j])
         l_ij = len(self.E2V_set[e_i].intersection(self.E2V_set[e_j]))
-        overlap = l_ij  # overlap = l_ij/max(l_i, l_j)
+        # overlap = l_ij
+        overlap = l_ij/max(l_i, l_j)
         jaccard = l_ij/(l_i + l_j - l_ij)
-        cosine = l_ij/l_i*l_j
+        cosine = l_ij/((l_i*l_j)**0.5)
         dice = 2*l_ij/(l_i + l_j)
         instance = [e_i, e_j]
 
         sims = [overlap, jaccard, cosine, dice]
         return instance, sims
+        #  return instance, overlap, jaccard, cosine, dice
 
-    def enumerate_instances_multisim(self, pos_size, neg_size, rand_seed=2024):
+    def enumerate_instances_multi(self, pos_size, neg_size, rand_seed=2024):
         np.random.seed(rand_seed)
 
         instances, similarities = [], []
+        oc, ji, cs, di = [], [], [], []
 
         for e_i in trange(len(self.E2V), position=0, leave=False):
             size_i = len(self.E2V[e_i])
@@ -97,17 +100,32 @@ class Enumeration():
             for _ in range(pos_size):
                 e_j = self.sample_neighbor(e_i)
 
-                instance, sims = self.get_instance_info(e_i, e_j)
+                # instance, o, j, c, d = self.get_instance_info_multi(e_i, e_j)
+                instance, similarity = self.get_instance_info_multi(e_i, e_j)
                 instances.append(instance)
-                similarities.append(sims)
+                similarities.append(similarity)
+                # oc.append(o)
+                # ji.append(j)
+                # cs.append(c)
+                # di.append(d)
 
             for _ in range(neg_size):
                 e_j = pyfastrand.pcg32bounded(len(self.E2V))
-                instance, sims = self.get_instance_info(e_i, e_j)
+                # instance, o, j, c, d = self.get_instance_info_multi(e_i, e_j)
+                instance, similarity = self.get_instance_info_multi(e_i, e_j)
                 instances.append(instance)
-                similarities.append(sims)
+                similarities.append(similarity)
+                # oc.append(o)
+                # ji.append(j)
+                # cs.append(c)
+                # di.append(d)
 
         instances = torch.tensor(instances)
         similarities = torch.tensor(similarities).float()
+        # oc = torch.tensor(oc)
+        # ji = torch.tensor(ji)
+        # cs = torch.tensor(cs)
+        # di = torch.tensor(di)
+
 
         return instances, similarities

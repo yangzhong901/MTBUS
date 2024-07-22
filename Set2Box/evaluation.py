@@ -17,11 +17,12 @@ import set2boxp
 EPS = 1e-10
 
 class Evaluation():
-    def __init__(self, sets):
+    def __init__(self, sets, is_multitask):
         super().__init__()
-        self.sets = sets
         self.idx = {}
         self.ans = {}
+        self.sets = sets
+        self.is_multitask = is_multitask
         self.ground_truth()
         
     def ground_truth(self, num_samples=100000, rand_seed=2024):
@@ -38,7 +39,7 @@ class Evaluation():
             ### Ground-truth similarites
             for metric in ['oc', 'ji', 'cs', 'di']:
                 self.ans[dtype][metric] = \
-                    utils.gt_pairwise_similarity(self.sets[dtype], self.idx[dtype]['i'], self.idx[dtype]['j'], metric)
+                    utils.gt_pairwise_similarity(self.sets[dtype], self.idx[dtype]['i'], self.idx[dtype]['j'], metric, self.is_multitask)
 
     def pairwise_similarity(self, our_model, S, M, beta, dtype, dim, set2box=True):
         our_model.eval()
@@ -91,7 +92,7 @@ class Evaluation():
         pred = {
             'oc': (inter_ij / torch.min(V_i, V_j)).detach(),
             'ji': (inter_ij / union_ij).detach(),
-            'cs': (inter_ij / (pow(V_i * V_j), 1/dim)).detach(),  # box cosine = intersection/pow((Vi*Vj), dimension)
+            'cs': (inter_ij / ((V_i * V_j)**0.5)).detach(),  # box cosine = intersection/pow((Vi*Vj), dimension)
             'di': ((2 * inter_ij) / (V_i + V_j)).detach()
         }
 
@@ -125,7 +126,7 @@ class Evaluation():
         embed = torch.cat(embed, 1)
         return embed
 
-    def pairwise_similarity_multitask(self, our_model, S, M, beta, dtype, dim, set2box=True):
+    def pairwise_similarity_multitask(self, our_model, S, M, beta, dtype, dim):
         our_model.eval()
         device = next(our_model.parameters()).device
 
@@ -139,13 +140,12 @@ class Evaluation():
         for batch in batches:
             S_temp = S[batch].to(device)
             M_temp = M[batch].to(device)
-            if set2box:
-                _c, _r = our_model.embed_set(S_temp, M_temp)
-            else:
-                _, _, _c, _r = our_model.embed_set(S_temp, M_temp)
+
+            _c, _r = our_model.embed_set(S_temp, M_temp)
             c.append(_c.cpu().detach())
             r.append(_r.cpu().detach())
             del S_temp, M_temp
+
         c = torch.cat(c, 0)
         r = torch.cat(r, 0)
         c, r = c.cpu(), r.cpu()
@@ -165,21 +165,22 @@ class Evaluation():
 
         inter_ij = torch.sum(torch.log(F.softplus(torch.min(M_i, M_j) - torch.max(m_i, m_j), beta) + EPS), 1)
         union_ij = torch.sum(torch.log(F.softplus(torch.max(M_i, M_j) - torch.min(m_i, m_j), beta) + EPS), 1)
-        V_i = torch.sum(torch.log(F.softplus(r_i, beta) + EPS), 1)
-        V_j = torch.sum(torch.log(F.softplus(r_j, beta) + EPS), 1)
+        V_i = torch.sum(torch.log(F.softplus(M_i - m_i, beta) + EPS), 1)
+        V_j = torch.sum(torch.log(F.softplus(M_j - m_j, beta) + EPS), 1)
+        V_mul_ij = V_i + V_j
 
-        Z = torch.max(union_ij)
-
-        inter_ij = torch.exp(inter_ij - Z)
-        union_ij = torch.exp(union_ij - Z)
-        V_i = torch.exp(V_i - Z)
-        V_j = torch.exp(V_j - Z)
+        # pred_oc = torch.exp(inter_ij)
+        pred_oc = torch.exp(inter_ij - torch.max(V_i, V_j))
+        pred_ji = torch.exp(inter_ij - union_ij)
+        # box cosine = intersection/pow((Vi*Vj), dimension), after log, mul()-> plus(), pow()-> division()
+        pred_cs = torch.exp(inter_ij - V_mul_ij/2)
+        pred_di = 2*torch.exp(inter_ij)/(torch.exp(V_i) + torch.exp(V_j))
 
         pred = {
-            'oc': inter_ij.detach(),  # 'oc': (inter_ij / torch.max(V_i, V_j)).detach(),
-            'ji': (inter_ij / union_ij).detach(),
-            'cs': (inter_ij / (pow(V_i * V_j), 1/dim)).detach(),  # box cosine = intersection/pow((Vi*Vj), dimension)
-            'di': ((2 * inter_ij) / (V_i + V_j)).detach()
+            'oc': pred_oc.detach(),
+            'ji': pred_ji.detach(),
+            'cs': pred_cs.detach(),
+            'di': pred_di.detach()
         }
 
         return pred

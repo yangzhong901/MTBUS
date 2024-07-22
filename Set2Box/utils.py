@@ -27,10 +27,12 @@ def parse_args():
     
     parser.add_argument("--batch_size", default=512, type=int, help='batch size')
     parser.add_argument("--epochs", default=200, type=int, help='number of epochs')
-    parser.add_argument("--learning_rate", default=1e-3, type=float, help='learning rate')
+    parser.add_argument("--learning_rate", default=1e-4, type=float, help='learning rate')
     parser.add_argument("--dim", default=4, type=int, help='embedding dimension')
     parser.add_argument("--beta", default=1, type=float, help='beta for box smoothness')
-    
+
+    parser.add_argument("--weight", default='EW', type=str, help='task weighting strategy')
+
     parser.add_argument("--K", default=30, type=int, help='quantization: K')
     parser.add_argument("--D", default=4, type=int, help='quantization: D')
     parser.add_argument("--tau", default=1.0, type=float, help='quantization: tau')
@@ -58,8 +60,8 @@ def write_log(log_path, log_dic):
             f.write(_key + '\t' + str(log_dic[_key]) + '\n')
         f.write('\n')
 
-def write_embed(dataname, embeds):
-    f = open('{}/{}_embeds.txt'.format('./output-data', dataname), 'w')
+def write_embed(dataname, embeds, dim, lr):
+    f = open('{}/{}_embeds_{}_lr{}.txt'.format('./output-data', dataname, dim, lr), 'w')
     for embed in embeds:
         for val in embed:
             f.write(str(round(val.item(), 8)) + '\t')
@@ -102,7 +104,7 @@ def bitcount(n):
         n = n & (n-1)
     return count
 
-def gt_pairwise_similarity(sets, idx_i, idx_j, metric='ji'):
+def gt_pairwise_similarity(sets, idx_i, idx_j, metric='ji',is_multitask=False):
     num_sets = len(sets)
     sizes = [len(_set) for _set in sets]
     
@@ -126,7 +128,10 @@ def gt_pairwise_similarity(sets, idx_i, idx_j, metric='ji'):
             inter = bitcount(set2bin[i] & set2bin[j])
             size_i = sizes[i]
             size_j = sizes[j]
-            ans.append(inter / min(size_i, size_j))
+            if is_multitask:
+                ans.append(inter / max(size_i, size_j))
+            else:
+                ans.append(inter / min(size_i, size_j))
     elif metric == 'di':
         for idx in trange(len(idx_i)):
             i, j = idx_i[idx], idx_j[idx]

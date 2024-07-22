@@ -71,7 +71,7 @@ print('Enumerating pairs done:\t\t', time.time() - start_time, '\n')
 # Prepare Evaluation ##########
 start_time = time.time()
 
-evaluation = evaluation.Evaluation(sets)
+evaluation = evaluation.Evaluation(sets, isMultitask=False)
 
 print('Preparing evaluation done:\t', time.time() - start_time, '\n')
 
@@ -88,12 +88,14 @@ S['train'] = S['train'].to(device)
 M['train'] = M['train'].to(device)
 overlaps = overlaps.to(device)
 
+total_time = time.time()
+epoch_losses = []
 for epoch in range(1, args.epochs + 1):
     print('\nEpoch:\t', epoch)
     
     # Train ##########
+
     train_time = time.time()
-    
     model.train()
     epoch_loss = 0
     
@@ -114,6 +116,7 @@ for epoch in range(1, args.epochs + 1):
         model.radius_embedding.weight.data = model.radius_embedding.weight.data.clamp(min=EPS)
 
     print('Loss:\t', epoch_loss, '\n')
+    epoch_losses.append(epoch_loss)
     train_time = time.time() - train_time
     print('train time:{}\t\t seconds'.format(train_time), '\n')
 
@@ -124,9 +127,13 @@ for epoch in range(1, args.epochs + 1):
         for metric in ['oc', 'ji', 'cs', 'di']:
             mse = mean_squared_error(pred[metric], evaluation.ans[dType][metric])
             print('{}_{} (MSE):\t'.format(dType, metric) + str(mse))
-        print('evaluation time:\t\t{} seconds'.format(time.time()-eva_time), '\n')
+        # print('evaluation time:\t\t{} seconds'.format(time.time()-eva_time), '\n')
+print('total train time:\t\t{} seconds'.format((time.time() - total_time)), '\t')
+print('average train time:\t\t{} seconds'.format((time.time() - total_time)/args.epochs), '\t')
+print('losses:', '\t')
+for loss in epoch_losses:
+    print(str(loss), '\t')
 
-
-output_data_name = args.dataset
+output_data_name = args.dataset + 'N'
 embeds = evaluation.get_embeds(model, S['test'], M['test'])
-utils.write_embed(output_data_name, embeds)
+utils.write_embed(output_data_name, embeds, args.dim, args.learning_rate)
