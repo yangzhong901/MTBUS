@@ -2,18 +2,26 @@
 
 using namespace std;
 
-void Vars::ReadPara(char* argv[])
+bool Vars::ReadPara(char* argv[])
 {   
     filePathEmb = argv[1];
     filePathTxt = argv[2];
     QNums = atoi(argv[3]);
-    Batch = atoi(argv[4]);
+    lambdaK=lambdaRange= atoi(argv[4]);
     SimF = atoi(argv[5]);
+    if (SimF == 0 || SimF == 1 || SimF == 2 || SimF == 3)
+        SimF = SimF;
+    else
+        return false;
     SearchF = atoi(argv[6]);
-    if (SearchF==0)
-        k= atoi(argv[7]);
+
+    if (SearchF == 0)
+        k = atof(argv[7]);
     else if (SearchF == 1)
         range = (float)atof(argv[7]);
+    else
+        return false;
+    return true;
 }
 
 void Vars::ShowPara()
@@ -21,7 +29,8 @@ void Vars::ShowPara()
     std::cout << "Record Nums: " << RNums << std::endl;
     std::cout << "Embedding Dimention: " << Dim << std::endl;
     std::cout << "Query Nums: " << QNums << std::endl;
-    std::cout << "Similarity: " << (SimilarityF)SimF << std::endl;
+    std::cout << "lambda: " << ((lambdaK > 0) ? lambdaK : lambdaRange) << std::endl;
+    std::cout << "SimilarityFunc: " << (SimilarityF)SimF << std::endl;
     
     const char* SearchFstr = (SearchF == 0) ? "TopKSearch" : "RangeSearch";
     std::cout << "Search Type: " << SearchFstr << std::endl;
@@ -138,7 +147,7 @@ void Vars::SaveResults()
         string writeStr = to_string(candidateSets[i].qID) + '\n';
         for (size_t j = 0; j < candidateSets[i].cans.size(); j++)
         {
-            writeStr += to_string(j) + '\t' + to_string(candidateSets[i].cans[j].rID) + '\t' + to_string(candidateSets[i].cans[j].boxIntersection)+"\n";
+            writeStr += to_string(j) + '\t' + to_string(candidateSets[i].cans[j].rID) + '\t' + to_string(candidateSets[i].cans[j].sim)+"\n";
         }
         
         const char* buffer = writeStr.data();
@@ -207,7 +216,7 @@ float Vars::Similarity(int simFun, vector<int> q, vector<int> r)
         }
     }
     if (simFun == Overlap)
-        similarity = (float)overlap;
+        similarity = (float)overlap/max(q.size(), r.size());
     else if (simFun == Jaccard)
         similarity = overlap * 1.0f / (q.size() + r.size() - overlap);
     else if (simFun == Cosine)
@@ -219,46 +228,6 @@ float Vars::Similarity(int simFun, vector<int> q, vector<int> r)
     return similarity;
 }
 
-
-void MatMul()
-{
-    int height = 1024;
-    int width = 1024;
-
-    //初始化
-    int** A = new int* [width];//A[a][b]
-    int** B = new int* [width];//B[b][a]
-    int** C = new int* [width];//C[m][n]=C[a][a]
-
-    for (int i = 0; i < height; i++)
-    {
-        A[i] = new int[height];
-        B[i] = new int[height];
-        C[i] = new int[height];
-    }
-
-    //赋值
-    for (int i = 0; i < width; i++)
-    {
-        for (int j = 0; j < height; j++)
-        {
-            A[i][j] = 1;
-            B[i][j] = 2;
-        }
-    }
-    //矩阵相乘
-    for (int m = 0; m < height; m++) {
-        for (int n = 0; n < height; n++)
-        {
-            int cvaule = 0;
-            for (int b = 0; b < width; b++)
-            {
-                cvaule += A[m][b] * B[b][n];
-            }
-            C[m][n] = cvaule;
-        }
-    }
-}
 
 void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candData>& cans, float qExpValue)
 {
@@ -276,18 +245,58 @@ void ComBoxIntersection(vector<float> q, vector<float> emb, int j, vector<candDa
     }
     candData cd;
     cd.rID = j;
-    cd.boxIntersection = boxInersection/ qExpValue;//regularization归一化到[0,1]区间
+    cd.sim = exp(boxInersection); //boxInersection regularization归一化到[0,1]区间?
     cans.push_back(cd);    
+}
+
+void ComBoxSim(vector<float> q, vector<float> emb, int j, vector<candData>& cans, SimilarityF f)
+{
+    int step = (int)emb.size() / 2;
+    float sim = 0.0;
+    float box_inersection = 0.0;
+    float box_union = 0.0;
+    float box_r = 0.0;
+    float box_q = 0.0;
+    for (size_t i = 0; i < step; i++)
+    {
+        float tmp_q = q[i + step] - q[i];
+        float tmp_i = min(q[i + step], emb[i + step]) - max(q[i], emb[i]);
+        float tmp_u = max(q[i + step], emb[i + step]) - min(q[i], emb[i]);
+        float tmp_r = emb[i + step] - emb[i];
+        if (tmp_i <= 0 || tmp_r<=0 || tmp_u<= 0|| tmp_q<=0)
+        {
+            sim = -1.0;
+            return;
+        }
+        box_inersection += (float)log(tmp_i);
+        box_union += (float)log(tmp_u);
+        box_r += (float)log(tmp_r);
+        box_q += (float)log(tmp_q);
+    }
+
+    if (f == Overlap)
+        sim = exp(box_inersection - max(box_r, box_q));
+    if (f == Jaccard)
+        sim = exp(box_inersection - box_union);
+    if (f == Cosine)
+        sim = exp(box_inersection - (box_r+box_q)/2);
+    if (f == Dice)
+        sim = 2*exp(box_inersection)/ (exp(box_q) + exp(box_r) + 1e-10);
+
+    candData cd;
+    cd.rID = j;
+    cd.sim = sim;
+    cans.push_back(cd);
 }
 
 bool canLesser(candData& a, candData& b)
 {
-    return a.boxIntersection < b.boxIntersection;
+    return a.sim < b.sim;
 }
 
 bool canLarger(candData& a, candData& b)
 {
-    return a.boxIntersection > b.boxIntersection;
+    return a.sim > b.sim;
 }
 
 bool resLesser(resultData& a, resultData& b)
@@ -300,29 +309,33 @@ bool resLarger(resultData& a, resultData& b)
     return a.similarity > b.similarity;
 }
 
-void Vars::SearchCandidates(int qID)
+void Vars::SearchCandidates(int qID, SimilarityF f)
 {
     candDatas candidateSet;
     candidateSet.qID = qID;
 
     //Compute qbox log value
-    float qExpValue = 1.0f;
-    for (size_t i = 0; i < embeddings[qID].size(); i++)
-    {
-        float tmp = embeddings[qID][i + step] - embeddings[qID][i];
-        qExpValue += log(tmp);
-    }
+    //float box_q = 1.0f;
+    //for (size_t i = 0; i < embeddings[qID].size(); i++)
+    //{
+    //    float tmp = embeddings[qID][i + step] - embeddings[qID][i];
+    //    if (tmp <= 0)
+    //    {
+    //        cout << "qi = " << qID  << "has a negatinve box" << endl;
+    //        candidateSets.push_back(candidateSet);
+    //        return;
+    //    }
+    //    else        
+    //        box_q += log(tmp);        
+    //    
+    //}
 
     //Search Candidates for qi
     for (size_t j = 0; j < embeddings.size(); j++)
     {
-        //if(j==1816)
-        ComBoxIntersection(embeddings[qID], embeddings[j], (int)j, candidateSet.cans, qExpValue);
+        ComBoxSim(embeddings[qID], embeddings[j], (int)j, candidateSet.cans, f);
     }
-    //for (size_t c = 0; c < candidateSet.cans.size(); c++)
-    //{
-    //    std::cout << "ID：" << candidateSet.cans[c].rID << ";" << candidateSet.cans[c].boxIntersection << std::endl;
-    //}
+
     //Save qi's candidates
     candidateSets.push_back(candidateSet);
 }
@@ -397,7 +410,7 @@ void Vars::topkSearch(int id, int qID)
     resultDatas resultSet;
     resultSet.qID = qID;
 
-    //若embedding相交的值可靠，candidate的顺序就是相似度的顺序
+    //若embedding的similarity值可靠，candidate的顺序就是相似度的顺序
     //但embedding一定有误差，加入一个估计系数，计算前lambda*k个cans
     size_t sizeC = (size_t)candidateSets[id].cans.size();
     size_t sizeK = (size_t)ceil(k * lambdaK);
@@ -420,7 +433,7 @@ void Vars::topkSearch(int id, int qID)
                 resultSet.res[k-1].similarity = result.similarity;
             }
             else
-                continue;        
+                continue;
         }
     }
     sort(resultSet.res.begin(), resultSet.res.end(), resLarger);
@@ -506,13 +519,18 @@ float Vars::ComputeAccuracy(resultDatas& r, resultDatas& r3)
 void CPUmain(char* argv[])
 {
     Vars vars;
-    vars.ReadPara(argv);
+    bool para = vars.ReadPara(argv);
+    if (!para)
+    {
+        cout << "parameter error = " << endl;
+        return;
+    }
     vars.ReadOrgTextData();
     vars.ReadEmbData();
     vars.ShowPara();
 
-    clock_t start, end;
-    start = clock();
+    clock_t start, end, start0;
+    start0=start = clock();
     //取QNums个随机记录作为查询Q
     srand((unsigned)2024);
     vector<int> qIDs;
@@ -526,18 +544,18 @@ void CPUmain(char* argv[])
     //Search Candidates and Sort
     for (size_t i = 0; i < qIDs.size(); i++)
     {
-        vars.SearchCandidates(qIDs[i]);        
+        vars.SearchCandidates(qIDs[i], (SimilarityF)vars.SimF);
         //候选按照embed相交的大小排序
         //从小到大排
-        //sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(), canLesser);
+        //sort(vars.candidateSets[i].cans.begin(), vars.candidateSets[i].cans.end(), canLesser);
         //从大到小排
-        sort(vars.candidateSets[qIDs[i]].cans.begin(), vars.candidateSets[qIDs[i]].cans.end(),canLarger);
+        if(vars.candidateSets[i].cans.size()>0)
+            sort(vars.candidateSets[i].cans.begin(), vars.candidateSets[i].cans.end(), canLarger);
     }
     end = clock();
-    cout << "CPUtime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
+    cout << "CPUSearchTime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
 
-    vars.lambdaK = 1.0f;
-    vars.lambdaRange = 1.0f;
+    start = clock();
     //Verify Results
     for (size_t i = 0; i < qIDs.size(); i++)
     {        
@@ -546,12 +564,14 @@ void CPUmain(char* argv[])
         if (vars.SearchF == 1)
             vars.rangeSearch((int)i,qIDs[i]);
     }
-
+    end = clock();
+    cout << "CPUVerifyTime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
+    cout << "CPUtotalTime = " << double(end - start0) / CLOCKS_PER_SEC << "s" << endl;
+    
     //Evaluation
     float tmpacc = 0;
     for (size_t i = 0; i < qIDs.size(); i++)
-    {
-        //vars.VerifyAllCandidates((int)i, qIDs[i]);
+    {        
         if (vars.SearchF == 0)
             vars.VerifyAllCandidatesForTopK((int)i, qIDs[i]);
         if (vars.SearchF == 1)
@@ -560,7 +580,7 @@ void CPUmain(char* argv[])
         //resultSet Comparison
         float acc = vars.ComputeAccuracy(vars.resultSets[i], vars.resultSets3[i]);
         cout << "q" << to_string(i) << " Accuracy:" << to_string(acc) <<endl;
-        vars.acccuacy.push_back(acc);
+        vars.acccuacy.push_back(acc);       
         tmpacc += acc;
     }
     vars.AverageAcy = tmpacc / vars.QNums;

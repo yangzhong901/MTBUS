@@ -7,28 +7,31 @@
 using namespace std;
 int main(int argc, char* argv[])
 {  
-    clock_t start, end;
+    std::clock_t start, end;
 
-    //使用GPU device 0: NVIDIA GeForce GTX 1060 with Max - Q Design
+    //使用GPU device 0: 
     //SM的数量：10
     //每个线程块的共享内存大小：48 KB
     //每个线程块的最大线程数：1024
     //每个SM的最大线程数：2048
     //每个SM的最大线程束数：64
-    //getCudaInformaton();
-
-    //std::cout << "GPU计算:\n";    
-    //start = clock();    
-    //CUDACompute(argv); 
-    ////CUDASingleQuery(argv);
-    //end = clock();
-    //cout << "time = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;   
-
-    //std::cout << "CPU计算:\n";
-    //start = clock();
-    //CPUmain(argv);
-    //end = clock();
-    //cout << "CPU计算time = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;    
+    
+    if (atoi(argv[8])== 0)
+    {
+        std::cout << "GPU Running:\n";
+        start = std::clock();
+        CUDACompute(argv);
+        end = std::clock();
+        cout << "CUDAtime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
+    }
+    if (atoi(argv[8]) == 1)
+    {
+        std::cout << "CPU Running:\n";
+        start = clock();
+        CPUmain(argv);
+        end = clock();
+        cout << "CPUtime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
+    }
 
     return 0;
 
