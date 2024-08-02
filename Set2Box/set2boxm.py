@@ -168,17 +168,6 @@ class model(nn.Module):
         att = torch.matmul(X, A)
         weight = torch_scatter.scatter_softmax(att[edges[1]], edges[0])
         a = torch_scatter.scatter_sum(X[edges[1]] * weight.unsqueeze(1), edges[0], dim=0)
-        # att2 = torch.sum(X[edges[1]] * a[edges[0]], 1)
-        # weight2 = torch_scatter.scatter_softmax(att2, edges[0])
-        # a2 = torch_scatter.scatter_sum(X[edges[1]] * weight2.unsqueeze(1), edges[0], dim=0)
-
-        # att3 = torch.sum(X[edges[1]] * a2[edges[0]], 1)
-        # weight3 = torch_scatter.scatter_softmax(att3, edges[0])
-        # a3 = torch_scatter.scatter_sum(X[edges[1]] * weight3.unsqueeze(1), edges[0], dim=0)
-        # att4 = torch.sum(X[edges[1]] * a3[edges[0]], 1)
-        # weight4 = torch_scatter.scatter_softmax(att4, edges[0])
-        # emb = torch_scatter.scatter_sum(X[edges[1]] * weight4.unsqueeze(1), edges[0], dim=0)
-
         emb = a
         sizes = torch.sum(M, 1).repeat_interleave(self.dim).view(len(emb), -1)
         emb = emb * (sizes ** (1.0 / self.dim))
