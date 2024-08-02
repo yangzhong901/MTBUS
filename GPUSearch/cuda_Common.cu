@@ -26,18 +26,18 @@ __global__ void AddKernel(float* a, float* b, float* c, int n)
 	}
 }
 
-// 矩阵类型，行优先，M(row, col) = *(M.elements + row * M.width + col)
+// M(row, col) = *(M.elements + row * M.width + col)
 struct Matrix
 {
-	int width;//行宽
-	int height;//列高
+	int width;//row
+	int height;//colume
 	float* elements;
 };
 
 struct MultiMatrix
 {
-    int width;//行宽
-    int height;//列高
+    int width;
+    int height;
     float* ov;
     float* ja;
     float* cs;
@@ -59,7 +59,7 @@ bool resimLarger(resultData& a, resultData& b)
     return a.similarity > b.similarity;
 }
 
-// 获取矩阵A的(row, col)元素
+//get element of A(row, col)
 __device__ float getElement(Matrix* A, int row, int col)
 {
 	return A->elements[row * A->width + col];
@@ -75,7 +75,7 @@ __device__ float* getElement(MultiMatrix* A, int row, int col)
     return values;
 }
 
-// 为矩阵A的(row, col)元素赋值
+// set element of A(row, col)
 __device__ void setElement(Matrix* A, int row, int col, float value)
 {
 	A->elements[row * A->width + col] = value;
@@ -89,7 +89,7 @@ __device__ void setElement(MultiMatrix* A, int row, int col, float value[])
     A->di[row * A->width + col] = value[3];
 }
 
-// 矩阵相乘kernel，2-D，每个线程计算一个元素
+// matMul kernel，2-D
 __global__ void matMulKernel(Matrix* A, Matrix* B, Matrix* C)
 {
 	float Cvalue = 0.0;
@@ -102,19 +102,19 @@ __global__ void matMulKernel(Matrix* A, Matrix* B, Matrix* C)
 	setElement(C, row, col, Cvalue);
 }
 
-//一次计算所有相似度
+//Kernel computing all similarities
 __global__ void ComputeAllSimsKernel(Matrix* R, Matrix* Q, MultiMatrix* C, int dim, int N)
 {
     float Cvalue[4]{};
     //float EPS = std::numeric_limits<float>::min();
-    int strade = blockDim.x * gridDim.x;//跳步的大小，等于线程的宽
+    int strade = blockDim.x * gridDim.x;//strade size
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,即行数，rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-row，rowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-col, rowA=colC
     int rowA = colC;
 
     int step = dim / 2;
-    //跳步循环，直到遍历所有数据N，则kernel对任意大小的N都可以实施
+    //loop for all data by strade, length=N
     while (colC < N)
     {
         float box_intersection = 0.0;
@@ -123,18 +123,17 @@ __global__ void ComputeAllSimsKernel(Matrix* R, Matrix* Q, MultiMatrix* C, int d
         float box_r = 0.0;
         for (int d = 0; d < step; d++)
         {
-            //计算每个维度A和B的box-embedding相交的大小
-            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+            //computer volumes of box-embeddings in each dimension
+            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))      
+                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           
 
-            float tmp_u = max(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - min(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+            float tmp_u = max(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       
+                - min(getElement(R, rowA, d), getElement(Q, rowC, d));                           
 
             float tmp_q = getElement(Q, rowC, d + step) - getElement(Q, rowC, d);
             float tmp_r = getElement(R, rowA, d + step) - getElement(R, rowA, d);
-            //需要每个维度都大于0 
-            //value *= tmp;//小数多次相乘会导致数值接近0，由于精度原因数值消失vanishing，需做log化运算
-            //log(x)+log(y)=log(xy);log相加等于相乘的log，再exp(log(x)+log(y))=xy，使得相乘计算的值得以保留；            
+            //log regularization    
+	    //if box_intersection<0, give it a small non-negtive value
             if (tmp_i <= 0)
                 box_intersection = log(1e-10);
             else
@@ -150,7 +149,7 @@ __global__ void ComputeAllSimsKernel(Matrix* R, Matrix* Q, MultiMatrix* C, int d
         Cvalue[2] = exp(box_intersection - (box_q + box_r) / 2);                 //Cosine
         Cvalue[3] = 2 * exp(box_intersection) / (exp(box_q) + exp(box_r) + 1e-10);//Dice
         setElement(C, rowC, colC, Cvalue);
-        colC += strade;//跳步
+        colC += strade;
     }
 }
 
@@ -159,14 +158,14 @@ __global__ void ComputeOverlapCKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, 
 {
     double Cvalue = 0.0;
 
-    int strade = blockDim.x * gridDim.x;//跳步的大小，等于线程的宽
+    int strade = blockDim.x * gridDim.x;
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,即行数，rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-row，rowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-col, rowA=colC
     int rowA = colC;
 
     int step = dim / 2;
-    //跳步循环，直到遍历所有数据N，则kernel对任意长度的N都可以实施
+    //loop for all data by strade, length=N
     while (colC < N)
     {        
         float box_intersection = 0.0;
@@ -174,13 +173,14 @@ __global__ void ComputeOverlapCKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, 
         float box_r = 0.0;
         for (int d = 0; d < step; d++)
         {
-            //计算每个维度A和B的box-embedding相交的大小
-            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+             //computer volumes of box-embeddings in each dimension
+            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       
+                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                          
             float tmp_q = getElement(Q, rowC, d + step) - getElement(Q, rowC, d);
             float tmp_r = getElement(R, rowA, d + step) - getElement(R, rowA, d);
            
-            //如果tmp_i小于0,给box一个大于0的EPS
+            //log regularization    
+	    //if box_intersection<0, give it a small non-negtive EPS value
             if (tmp_i <= 0)
             {
                 box_intersection = log(1e-10);
@@ -194,7 +194,7 @@ __global__ void ComputeOverlapCKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, 
         }
         Cvalue = exp(box_intersection - max(box_q, box_r));
         setElement(C, rowC, colC, Cvalue);
-        colC += strade;//跳步
+        colC += strade;
     }
 }
 
@@ -203,33 +203,26 @@ __global__ void ComputeJaccardKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, i
 {
     double Cvalue = 0.0;
     
-    int strade = blockDim.x * gridDim.x;//跳步的大小，等于线程的宽
+    int strade = blockDim.x * gridDim.x;
 
     int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,即行数，rowB=rowC
     int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC
     int rowA = colC;
 
     int step = dim / 2;
-    //跳步循环，直到遍历所有数据N，则kernel对任意长度的N都可以实施
+    
     while (colC < N)
     {        
         float box_intersection = 0.0;
         float box_union = 0.0;
         for (int d = 0; d < step; d++)
-        {
-            //计算每个维度A和B的box-embedding相交的大小
-            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+        {           
+            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       
+                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           
 
-            float tmp_u = max(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - min(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+            float tmp_u = max(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       
+                - min(getElement(R, rowA, d), getElement(Q, rowC, d));                          
 
-            //需要每个维度都大于0
-            //if (tmp <= 0)//并行线程内的判断影响同步，尽量减少if分支            
-            //Cvalue *= tmp;//小数多次相乘会导致数值接近0，由于精度原因数值消失vanishing，需做log计算
-            //log(x)+log(y)=log(xy);log相加等于相乘的log，使得相乘计算的值得以保留；
-            //tmp_i一定小于1，tmp_u一定大于0
-            //如果tmp_i小于0,给box一个大于0的EPS
             if (tmp_i <= 0)
             {
                 box_intersection = log(1e-10);
@@ -242,7 +235,7 @@ __global__ void ComputeJaccardKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, i
         }
         Cvalue = exp(box_intersection- box_union);
         setElement(C, rowC, colC, Cvalue);
-        colC += strade;//跳步
+        colC += strade;
     }
 }
 
@@ -251,14 +244,14 @@ __global__ void ComputeCosineKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, in
 {
     double Cvalue = 0.0;
 
-    int strade = blockDim.x * gridDim.x;//跳步的大小，等于线程的宽
+    int strade = blockDim.x * gridDim.x;
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,即行数，rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,rowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,rowA=colC
     int rowA = colC;
 
     int step = dim / 2;
-    //跳步循环，直到遍历所有数据N，则kernel对任意长度的N都可以实施
+    
     while (colC < N)
     {        
         float box_intersection = 0.0;
@@ -266,13 +259,12 @@ __global__ void ComputeCosineKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, in
         float box_r = 0.0;
         for (int d = 0; d < step; d++)
         {
-            //计算每个维度A和B的box-embedding相交的大小
-            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+            
+            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))      
+                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           
             float tmp_q = getElement(Q, rowC, d + step) - getElement(Q, rowC, d);
             float tmp_r = getElement(R, rowA, d + step) - getElement(R, rowA, d);
-
-            //如果tmp_i小于0,给tmp_i一个大于0的EPS
+            
             if (tmp_i <= 0)
             {
                 box_intersection = log(1e-10);
@@ -286,7 +278,7 @@ __global__ void ComputeCosineKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, in
         }
         Cvalue = exp(box_intersection - (box_q+ box_r)/2);
         setElement(C, rowC, colC, Cvalue);
-        colC += strade;//跳步
+        colC += strade;
     }
 }
 
@@ -295,14 +287,14 @@ __global__ void ComputeDiceKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int 
 {
     double Cvalue = 0.0;
 
-    int strade = blockDim.x * gridDim.x;//跳步的大小，等于线程的宽
+    int strade = blockDim.x * gridDim.x;
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,即行数，rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,rowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,rowA=colC
     int rowA = colC;
 
     int step = dim / 2;
-    //跳步循环，直到遍历所有数据N，则kernel对任意长度的N都可以实施
+    
     while (colC < N)
     {
         float box_intersection = 0.0;
@@ -310,13 +302,12 @@ __global__ void ComputeDiceKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int 
         float box_r = 0.0;
         for (int d = 0; d < step; d++)
         {
-            //计算每个维度A和B的box-embedding相交的大小
-            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+            
+            float tmp_i = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))      
+                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           
             float tmp_q = getElement(Q, rowC, d + step) - getElement(Q, rowC, d);
             float tmp_r = getElement(R, rowA, d + step) - getElement(R, rowA, d);
-
-            //如果tmp_i小于0,给tmp_i一个大于0的EPS
+            
             if (tmp_i <= 0)
             {
                 box_intersection = log(1e-10);
@@ -330,67 +321,60 @@ __global__ void ComputeDiceKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int 
         }
         Cvalue = 2*exp(box_intersection)/ (exp(box_q) + exp(box_r) + 1e-10);
         setElement(C, rowC, colC, Cvalue);
-        colC += strade;//跳步
+        colC += strade;
     }
 }
 
-//计算Box-Embedding相交的大小
+//compute Box-intersection
 __global__ void ComputeKernel(Matrix* R, Matrix* Q, Matrix* C, int dim, int N)
 {
-    double Cvalue = 0.0;//后续相乘，初始必须为1
+    double Cvalue = 0.0;
 
-    int strade = blockDim.x * gridDim.x;//跳步的大小，等于线程的宽
+    int strade = blockDim.x * gridDim.x;
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,即行数，rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,rowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c, rowA=colC
     int rowA = colC;
 
     int step = dim / 2;
-    //跳步循环，直到遍历所有数据N，则kernel对任意长度的N都可以实施
+    
     while (colC < N)
     {        
         for (int d = 0; d < step; d++)
         {
-            //计算每个维度A和B的box-embedding相交的大小
-            double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
-            //需要每个维度都大于0
-            //if (tmp <= 0)//并行线程内的判断影响同步，尽量减少if分支            
-            //Cvalue *= tmp;//小数多次相乘会导致数值接近0，由于精度原因数值消失vanishing，需做正则化Normalization
-            //log(x)+log(y)=log(xy);log相加等于相乘的log，使得相乘计算的值得以保留；
-            //给tmp一个EPS，如果小于0
+            
+            double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       
+                - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           
+
             if (tmp <= 0)
                 Cvalue = log(1e-10);
             else
                 Cvalue += log(tmp);
-            //Cvalue += log(tmp);            
+                       
         }
         Cvalue = exp(Cvalue);
         setElement(C, rowC, colC, Cvalue);
-        colC += strade;//跳步
+        colC += strade;
     }
 }
 
-//线程足够时，无跳步循环
+//no strade
 __global__ void ComputeKernel2(Matrix* R, Matrix* Q, Matrix* C, int dim)
 {
     double Cvalue = 0.0;
 
-    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r,即行数，rowB=rowC
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC
+    int rowC = threadIdx.y + blockIdx.y * blockDim.y; //blockId-r, rowB=rowC
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c, rowA=colC
     int rowA = colC;
     int step = dim / 2;
     
     for (int d = 0; d < step; d++)
     {
-        //计算每个维度A和B的box-embedding相交的大小
-        double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       //后半元素
-            - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           //前半元素
+        
+        double tmp = min(getElement(R, rowA, d + step), getElement(Q, rowC, d + step))       
+            - max(getElement(R, rowA, d), getElement(Q, rowC, d));                           
 
-        //需要每个维度都大于0,
-        //Cvalue *= tmp;//小数多次相乘会导致数值接近0，数值消失vanishing，需做正则化Normalization
-        // log正则化,且log之后，tmp小于零会得到nan
-        if (tmp <= 0)
+       if (tmp <= 0)
             tmp = 1e-6;
         Cvalue += log(tmp);
 
@@ -403,17 +387,16 @@ __global__ void SingleQueryKernel(Matrix* R, float* Q, float* C, int dim)
 {
     float Cvalue = 0.0;
 
-    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c,即列数, rowA=colC 64*32=2048
+    int colC = threadIdx.x + blockIdx.x * blockDim.x; //blockId-c, rowA=colC
     int rowA = colC;
     int step = dim / 2;
 
     for (int d = 0; d < step; d++)
     {
-        //计算每个维度A和B的box-embedding相交的大小
-        float tmp = min(R->elements[rowA * R->width + d + step], Q[d + step])       //后半元素
-            - max(R->elements[rowA * R->width + d], Q[d]);                          //前半元素
-
-        //需要每个维度都大于0
+        
+        float tmp = min(R->elements[rowA * R->width + d + step], Q[d + step])      
+            - max(R->elements[rowA * R->width + d], Q[d]);                         
+        
         if (tmp <= 0)
             tmp = 1e-6;
         Cvalue += log(tmp);
@@ -422,7 +405,7 @@ __global__ void SingleQueryKernel(Matrix* R, float* Q, float* C, int dim)
     C[colC]=Cvalue;
 }
 
-//获取GPU信息
+//get GPU information
 void getCudaInformaton()
 {
 	int dev = 0;
@@ -521,7 +504,7 @@ void CUDASingleQuery(char* argv[])
 void CUDACompute(char* argv[])
 {
     getCudaInformaton();
-    //读数据
+    //read data
     Vars vars;
     bool para = vars.ReadPara(argv);
     if (!para)
@@ -638,16 +621,6 @@ void CUDACompute(char* argv[])
     
     end0 = end = clock();
     cout << "GPUSearchTime = " << double(end - start) / CLOCKS_PER_SEC << "s" << endl;
-    
-    //for (size_t i = 0; i < C->width; i++)
-    //{
-    //    //C(row, col) = *(C.elements + row * C.width + col)
-    //    if (C->elements[q0id*C->width + i]!=NULL)
-    //    {
-    //        std::cout << "ID：" << i << ";" << C->elements[q0id * C->width + i] << std::endl;
-    //    }
-    //    
-    //}
     
     //Save Cadidates
     start = clock();
@@ -969,51 +942,6 @@ void CUDAComputeAllSims(char* argv[])
         if (vars.SearchF == 1)
             vars.rangeSearch((int)i, queries[i]);
     }
-    return;
-}
-
-
-void CUDA_main()
-{	
-    int width = 1024;
-    int height = 1024;
-    Matrix* A, * B, * C;
-    // 申请托管内存
-    cudaMallocManaged((void**)&A, sizeof(Matrix));
-    cudaMallocManaged((void**)&B, sizeof(Matrix));
-    cudaMallocManaged((void**)&C, sizeof(Matrix));
-    int nBytes = width * height * sizeof(float);
-    cudaMallocManaged((void**)&A->elements, nBytes);
-    cudaMallocManaged((void**)&B->elements, nBytes);
-    cudaMallocManaged((void**)&C->elements, nBytes);
-
-    // 初始化数据
-    A->height = height;
-    A->width = width;
-    B->height = height;
-    B->width = width;
-    C->height = height;
-    C->width = width;
-    for (int i = 0; i < width * height; ++i)
-    {
-        A->elements[i] = 1.0;
-        B->elements[i] = 2.0;
-    }
-
-    // 定义kernel的执行配置
-    dim3 blockSize(32, 32);//32*32
-    dim3 gridSize((width + blockSize.x - 1) / blockSize.x,
-        (height + blockSize.y - 1) / blockSize.y);//(1024+31)/32=32.97
-    // 执行kernel//忽略错误提示
-    matMulKernel << < gridSize, blockSize >> > (A, B, C);
-
-    // 同步device 保证结果能正确访问
-    cudaDeviceSynchronize();
-    // 检查执行结果
-    float maxError = 0.0;
-    for (int i = 0; i < width * height; ++i)
-        maxError = fmax(maxError, fabs(C->elements[i] - 2 * width));
-    std::cout << "最大误差: " << maxError << std::endl;
     return;
 }
 
