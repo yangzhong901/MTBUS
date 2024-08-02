@@ -313,23 +313,7 @@ void Vars::SearchCandidates(int qID, SimilarityF f)
 {
     candDatas candidateSet;
     candidateSet.qID = qID;
-
-    //Compute qbox log value
-    //float box_q = 1.0f;
-    //for (size_t i = 0; i < embeddings[qID].size(); i++)
-    //{
-    //    float tmp = embeddings[qID][i + step] - embeddings[qID][i];
-    //    if (tmp <= 0)
-    //    {
-    //        cout << "qi = " << qID  << "has a negatinve box" << endl;
-    //        candidateSets.push_back(candidateSet);
-    //        return;
-    //    }
-    //    else        
-    //        box_q += log(tmp);        
-    //    
-    //}
-
+    
     //Search Candidates for qi
     for (size_t j = 0; j < embeddings.size(); j++)
     {
@@ -409,8 +393,7 @@ void Vars::topkSearch(int id, int qID)
 {    
     resultDatas resultSet;
     resultSet.qID = qID;
-
-    //若embedding的similarity值可靠，candidate的顺序就是相似度的顺序
+    
     //但embedding一定有误差，加入一个估计系数，计算前lambda*k个cans
     size_t sizeC = (size_t)candidateSets[id].cans.size();
     size_t sizeK = (size_t)ceil(k * lambdaK);
@@ -446,8 +429,7 @@ void Vars::rangeSearch(int id, int qID)
 {   
     resultDatas resultSet;
     resultSet.qID = qID;    
-
-    //若embedding相交的值可靠，candidate的顺序就是相似度的顺序
+    
     //但embedding一定有误差，加入一个估计系数，找到小于range的参数后，再继续计算lambda*i个cans
     size_t sizeC = (int)candidateSets[id].cans.size();
      
@@ -459,7 +441,7 @@ void Vars::rangeSearch(int id, int qID)
                
         if (result.similarity >= range)
             resultSet.res.push_back(result);
-        else//再继续计算lambda*i个cans
+        else
         {
             size_t sizeR = (size_t)ceil(lambdaRange * i);
             if (sizeC > sizeR)
@@ -483,7 +465,7 @@ void Vars::EstimateSearch(int id, int qID)
         float tmp = embeddings[qID][i]- embeddings[qID][i-step];
         estimateQBox *= (float)abs(log10(tmp));
     }
-
+    //
 
 
 }
@@ -545,7 +527,7 @@ void CPUmain(char* argv[])
     for (size_t i = 0; i < qIDs.size(); i++)
     {
         vars.SearchCandidates(qIDs[i], (SimilarityF)vars.SimF);
-        //候选按照embed相交的大小排序
+        //sort by box embedding similarity
         //从小到大排
         //sort(vars.candidateSets[i].cans.begin(), vars.candidateSets[i].cans.end(), canLesser);
         //从大到小排
