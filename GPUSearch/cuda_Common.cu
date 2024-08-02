@@ -601,7 +601,7 @@ void CUDACompute(char* argv[])
     gridy = (height + blocky - 1) / blocky;//高，固定为gridy*blocky=Qnum的长度，gridy<2^31-1  
     gridx = (width + blockx - 1) / blockx;//宽，gridx*gridy最好为sm的倍数2倍以上，且为32的倍数，实际数据不会总是32的倍数
     dim3 blockSize(blockx, blocky);//[32,32]
-    dim3 gridSize(gridx, gridy);//[28, Qnums/32]
+    dim3 gridSize(gridx, gridy);//
 
     //kernel
     //ComputeKernel << < gridSize, blockSize >> > (R, Q, C, dim, width);
